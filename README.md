@@ -58,11 +58,25 @@ Set:
 ```bash
 ./scripts/setup.sh
 ```
+The setup script can auto-detect your existing SmartThings MCP repo and offer to register Flair as a gateway upstream.
 
 4. Validate health:
 ```bash
 curl -sS "http://localhost:8090/healthz?deep=1"
 ```
+
+## SmartThings Gateway Integration
+If `SmartThingsMCP` is detected, setup offers to add:
+- upstream name: `flair`
+- upstream url: `http://localhost:8090/mcp`
+
+It writes to SmartThings upstream config and can restart `smartthings-mcp.service` so the gateway picks it up.
+
+You can preseed integration behavior:
+- `INTEGRATE_SMARTTHINGS_GATEWAY=true|false`
+- `SMARTTHINGS_MCP_DIR=/path/to/SmartThingsMCP`
+- `SMARTTHINGS_UPSTREAM_NAME=flair`
+- `RESTART_SMARTTHINGS_SERVICE=true|false`
 
 ## mcporter Usage
 Register server:
