@@ -105,7 +105,8 @@ You get automation power with intent boundaries, rather than a free-range API fr
 - `list_structures`
 - `list_rooms`
 - `list_vents`
-- `list_devices` (concise summary by default)
+- `list_devices` (mobile app devices; concise summary by default)
+- `list_named_devices` (named HVAC/room devices across vents, pucks, thermostats, sensors)
 - `list_resources`
 - `get_resource`
 - `get_related_resources`
@@ -245,12 +246,17 @@ Example calls:
 ```bash
 npx -y mcporter call --server flair --tool list_structures --output json
 npx -y mcporter call --server flair --tool list_devices --output json
+npx -y mcporter call --server flair --tool list_named_devices --output json
+npx -y mcporter call --server flair --tool list_named_devices --args '{"resource_types":["vents","pucks","thermostats","remote-sensors"],"max_items_per_type":100}' --output json
 npx -y mcporter call --server flair --tool list_devices --args '{"max_items":50,"page_size":50}' --output json
 npx -y mcporter call --server flair --tool list_devices --args '{"include_raw":true}' --output json
 npx -y mcporter call --server flair --tool list_rooms --args '{"structure_id":"<structure-id>"}' --output json
 ```
 
-`list_devices` returns a deduplicated `devices` summary with stable names; use `include_raw=true` when you need full raw JSON:API payloads.
+`list_devices` returns mobile app devices tied to users/geofencing. Some may not have names in Flair's API.
+`list_named_devices` is the preferred call when you want room/HVAC device names.
+
+`list_devices` and `list_named_devices` return deduplicated summaries with `name_source` (`api` or `derived`); use `include_raw=true` when you need full JSON:API payloads.
 Default fetch limits are `page_size=100` and `max_items=200`; tune `max_items`/`page_size` as needed.
 
 ## Keep Skill In Sync
