@@ -3,6 +3,11 @@ import { z } from "zod";
 
 dotenv.config();
 
+const emptyToUndefined = (value: unknown) => {
+  if (typeof value === "string" && value.trim().length === 0) return undefined;
+  return value;
+};
+
 const boolFromEnv = (value: string | undefined, defaultValue: boolean) => {
   if (typeof value === "undefined") return defaultValue;
   return ["1", "true", "yes", "y"].includes(value.toLowerCase());
@@ -10,7 +15,7 @@ const boolFromEnv = (value: string | undefined, defaultValue: boolean) => {
 
 const schema = z.object({
   PORT: z.coerce.number().int().positive().default(8090),
-  PUBLIC_URL: z.string().url().optional(),
+  PUBLIC_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   MCP_HTTP_PATH: z.string().default("/mcp"),
   HEALTH_PATH: z.string().default("/healthz"),
 
@@ -25,12 +30,12 @@ const schema = z.object({
   FLAIR_RETRY_BASE_MS: z.coerce.number().int().positive().default(250),
   FLAIR_TOKEN_SKEW_SEC: z.coerce.number().int().min(0).default(30),
 
-  ALLOWED_MCP_HOSTS: z.string().optional(),
-  ALLOWED_MCP_ORIGINS: z.string().optional(),
-  WRITE_TOOLS_ENABLED: z.string().optional(),
+  ALLOWED_MCP_HOSTS: z.preprocess(emptyToUndefined, z.string().optional()),
+  ALLOWED_MCP_ORIGINS: z.preprocess(emptyToUndefined, z.string().optional()),
+  WRITE_TOOLS_ENABLED: z.preprocess(emptyToUndefined, z.string().optional()),
 
   LOG_LEVEL: z.string().default("info"),
-  LOG_FILE: z.string().optional()
+  LOG_FILE: z.preprocess(emptyToUndefined, z.string().optional())
 });
 
 const parsed = schema.safeParse(process.env);

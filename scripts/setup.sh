@@ -102,6 +102,16 @@ set_default() {
   fi
 }
 
+set_default_if_blank() {
+  local key="$1"
+  local value="$2"
+  local current
+  current=$(read_env "$key" || true)
+  if [ -z "${current// }" ]; then
+    update_env "$key" "$value"
+  fi
+}
+
 json_query() {
   local file="$1"
   local expr="$2"
@@ -478,6 +488,7 @@ main() {
   set_default WRITE_TOOLS_ENABLED "false"
   set_default LOG_LEVEL "info"
   set_default LOG_FILE "$ROOT_DIR/data/flair-mcp.log"
+  set_default_if_blank LOG_FILE "$ROOT_DIR/data/flair-mcp.log"
 
   configure_credentials
 
