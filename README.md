@@ -65,11 +65,6 @@ For official onboarding and credentials, start at:
 
 Follow the getting-started instructions there to obtain your API access.
 
-### Strongly recommended
-- Restrictive host/origin allowlists
-- Separate OAuth clients per environment (dev/staging/prod)
-- HTTPS via reverse proxy/tunnel if accessed remotely
-
 ### Key environment variables
 See `.env.example` for the complete list. Most important:
 
