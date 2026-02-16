@@ -37,6 +37,102 @@ const relationContainsId = (resource: JsonApiResource, relationshipName: string,
   return rel.data?.id === id;
 };
 
+const getRelationId = (resource: JsonApiResource, relationshipName: string) => {
+  const rel = resource.relationships?.[relationshipName];
+  if (!rel?.data) return undefined;
+  if (Array.isArray(rel.data)) return rel.data[0]?.id;
+  return rel.data.id;
+};
+
+const firstString = (record: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
+};
+
+const toBool = (value: unknown) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "y"].includes(normalized)) return true;
+    if (["false", "0", "no", "n"].includes(normalized)) return false;
+  }
+  return undefined;
+};
+
+const dedupeResourcesById = (resources: JsonApiResource[]) => {
+  const seen = new Set<string>();
+  const unique: JsonApiResource[] = [];
+  let duplicates = 0;
+
+  for (const item of resources) {
+    if (seen.has(item.id)) {
+      duplicates += 1;
+      continue;
+    }
+    seen.add(item.id);
+    unique.push(item);
+  }
+
+  return { unique, duplicates };
+};
+
+const deviceDisplayName = (resource: JsonApiResource) => {
+  const attrs = resource.attributes ?? {};
+  const explicit = firstString(attrs, ["name", "display-name", "display_name", "label", "title"]);
+  if (explicit) return explicit;
+
+  const manufacturer = firstString(attrs, ["manufacturer", "brand", "device-brand-name"]);
+  const model = firstString(attrs, ["model", "model-name", "model_name", "device-model"]);
+  if (manufacturer || model) {
+    return [manufacturer, model].filter(Boolean).join(" ");
+  }
+
+  return `Device ${resource.id.slice(0, 8)}`;
+};
+
+const withDeviceFallbackName = (resource: JsonApiResource): JsonApiResource => {
+  const attrs = { ...(resource.attributes ?? {}) };
+  const explicit = firstString(attrs, ["name", "display-name", "display_name", "label", "title"]);
+  if (!explicit) {
+    attrs.name = deviceDisplayName(resource);
+  }
+  return {
+    ...resource,
+    attributes: attrs
+  };
+};
+
+const compactObject = <T extends Record<string, unknown>>(value: T) => {
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => typeof v !== "undefined")) as T;
+};
+
+const SENSITIVE_KEY = /(?:^|[-_])(secret|token|password|passphrase|api[-_]?key|authorization)(?:$|[-_])/i;
+
+const redactSensitive = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSensitive(item));
+  }
+
+  if (typeof value === "object" && value !== null) {
+    const next: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (SENSITIVE_KEY.test(key)) {
+        next[key] = "[REDACTED]";
+      } else {
+        next[key] = redactSensitive(item);
+      }
+    }
+    return next;
+  }
+
+  return value;
+};
+
 export class FlairApiClient {
   private apiRootCache: Record<string, ApiRootLink> | null = null;
 
@@ -228,9 +324,31 @@ export class FlairApiClient {
       });
     }
 
+    const { unique, duplicates } = dedupeResourcesById(filtered);
+    const normalized = unique.map((item) => withDeviceFallbackName(item));
+    const devices = normalized.map((item) => {
+      const attrs = item.attributes ?? {};
+      return compactObject({
+        id: item.id,
+        type: item.type,
+        name: deviceDisplayName(item),
+        structure_id: getRelationId(item, "structure"),
+        room_id: getRelationId(item, "room"),
+        active: toBool(attrs["active"] ?? attrs["is-active"]),
+        online: toBool(attrs["online"] ?? attrs["is-online"]),
+        manufacturer: firstString(attrs, ["manufacturer", "brand", "device-brand-name"]),
+        model: firstString(attrs, ["model", "model-name", "model_name", "device-model"])
+      });
+    });
+
     return {
       ...result,
-      data: filtered
+      data: normalized,
+      devices,
+      summary: {
+        count: devices.length,
+        duplicatesRemoved: duplicates
+      }
     };
   }
 
@@ -435,5 +553,5 @@ export const normalizeFlairError = (err: unknown) => {
 };
 
 export const toJsonOutput = (data: unknown) => ({
-  content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }]
+  content: [{ type: "text" as const, text: JSON.stringify(redactSensitive(data), null, 2) }]
 });

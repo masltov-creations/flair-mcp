@@ -41,7 +41,8 @@ const listVentsSchema = {
 const listDevicesSchema = {
   structure_id: id.optional(),
   room_id: id.optional(),
-  active_only: z.boolean().optional().default(false)
+  active_only: z.boolean().optional().default(false),
+  include_raw: z.boolean().optional().default(false)
 };
 
 const updateResourceSchema = {
@@ -113,6 +114,14 @@ export function createFlairMcpServer(flairApi: FlairApiClient) {
       roomId: input.room_id,
       activeOnly: input.active_only
     });
+
+    if (!input.include_raw) {
+      return toJsonOutput({
+        devices: data.devices,
+        summary: data.summary
+      });
+    }
+
     return toJsonOutput(data);
   });
 
