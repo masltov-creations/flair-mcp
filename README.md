@@ -144,7 +144,7 @@ cp .env.example .env
 ```bash
 ./scripts/setup.sh
 ```
-The setup script can auto-detect your existing SmartThings MCP repo and offer to register Flair as a gateway upstream.
+The setup script can auto-detect your existing SmartThings MCP (shameless plug: https://github.com/masltov-creations/smartthings-mcp)  repo and offer to register Flair as a gateway upstream.
 
 5. Verify service + upstream API health:
 
