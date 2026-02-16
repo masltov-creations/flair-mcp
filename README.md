@@ -1,6 +1,6 @@
 # Flair MCP
 
-*A politely paranoid bridge between your AI tools and your Flair home data — now with 30% more British composure.*
+*A politely paranoid bridge between your AI tools and your Flair home data.*
 
 Flair MCP is a standalone MCP server for the Flair API (`api.flair.co`).
 It gives MCP-compatible clients (like `mcporter` and other MCP-enabled assistants) a safe, practical way to inspect and control Flair resources without handing raw API complexity to every tool call.
