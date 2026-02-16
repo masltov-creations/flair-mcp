@@ -105,7 +105,7 @@ You get automation power with intent boundaries, rather than a free-range API fr
 - `list_structures`
 - `list_rooms`
 - `list_vents`
-- `list_devices`
+- `list_devices` (concise summary by default)
 - `list_resources`
 - `get_resource`
 - `get_related_resources`
@@ -217,7 +217,18 @@ Example calls:
 ```bash
 npx -y mcporter call --server flair --tool list_structures --output json
 npx -y mcporter call --server flair --tool list_devices --output json
+npx -y mcporter call --server flair --tool list_devices --args '{"include_raw":true}' --output json
 npx -y mcporter call --server flair --tool list_rooms --args '{"structure_id":"<structure-id>"}' --output json
+```
+
+`list_devices` returns a deduplicated `devices` summary with stable names; use `include_raw=true` when you need full raw JSON:API payloads.
+
+## Keep Skill In Sync
+
+When `SKILL.md` changes, re-install it into OpenClaw:
+
+```bash
+cd /home/$USER/apps/flair-mcp && INSTALL_OPENCLAW_SKILL=true INSTALL_SYSTEMD=false CONFIGURE_MCPORTER=false INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh
 ```
 
 ---

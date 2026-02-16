@@ -17,7 +17,7 @@ Use Flair MCP safely to inspect structures/rooms/vents/devices and perform contr
 1. `list_resource_types`
 2. `list_structures`
 3. `list_rooms` (optionally filtered)
-4. `list_vents` or `list_devices`
+4. `list_vents` or `list_devices` (concise summary by default)
 5. `get_resource` / `get_related_resources` for deeper inspection
 
 ## Safety Rules
@@ -29,3 +29,4 @@ Use Flair MCP safely to inspect structures/rooms/vents/devices and perform contr
 - `403 Host not allowed`: update `ALLOWED_MCP_HOSTS`.
 - `401/403` upstream: verify Flair client credentials.
 - Timeouts: increase client timeout and inspect `/healthz?deep=1`.
+- If `list_devices` needs raw payloads, call with `{"include_raw": true}`.
