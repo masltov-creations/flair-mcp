@@ -71,6 +71,7 @@ See `.env.example` for the complete list. Most important:
 - `FLAIR_CLIENT_ID`
 - `FLAIR_CLIENT_SECRET`
 - `FLAIR_API_BASE_URL` (default `https://api.flair.co`)
+- `FLAIR_TOKEN_PATH` (default `/oauth2/token`)
 - `WRITE_TOOLS_ENABLED` (default `false`)
 - `ALLOWED_MCP_HOSTS`
 - `ALLOWED_MCP_ORIGINS`

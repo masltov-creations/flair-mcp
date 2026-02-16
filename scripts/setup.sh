@@ -479,7 +479,7 @@ main() {
   set_default HEALTH_PATH "/healthz"
   set_default FLAIR_API_BASE_URL "https://api.flair.co"
   set_default FLAIR_API_ROOT_PATH "/api/"
-  set_default FLAIR_TOKEN_PATH "/oauth/token"
+  set_default FLAIR_TOKEN_PATH "/oauth2/token"
   set_default FLAIR_REQUEST_TIMEOUT_MS "12000"
   set_default FLAIR_RETRY_MAX "2"
   set_default FLAIR_RETRY_BASE_MS "250"
@@ -490,6 +490,12 @@ main() {
   set_default LOG_LEVEL "info"
   set_default LOG_FILE "$ROOT_DIR/data/flair-mcp.log"
   set_default_if_blank LOG_FILE "$ROOT_DIR/data/flair-mcp.log"
+
+  # Migration: earlier defaults used /oauth/token, but Flair OAuth uses /oauth2/token.
+  if [ "$(read_env FLAIR_TOKEN_PATH || true)" = "/oauth/token" ]; then
+    warn "Updating deprecated FLAIR_TOKEN_PATH=/oauth/token to /oauth2/token"
+    update_env FLAIR_TOKEN_PATH "/oauth2/token"
+  fi
 
   configure_credentials
 

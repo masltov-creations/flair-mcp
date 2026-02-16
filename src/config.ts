@@ -23,7 +23,7 @@ const schema = z.object({
   FLAIR_CLIENT_SECRET: z.string().min(1),
   FLAIR_API_BASE_URL: z.string().url().default("https://api.flair.co"),
   FLAIR_API_ROOT_PATH: z.string().default("/api/"),
-  FLAIR_TOKEN_PATH: z.string().default("/oauth/token"),
+  FLAIR_TOKEN_PATH: z.string().default("/oauth2/token"),
 
   FLAIR_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(12000),
   FLAIR_RETRY_MAX: z.coerce.number().int().min(0).max(8).default(2),
