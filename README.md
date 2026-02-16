@@ -7,7 +7,7 @@ It gives MCP-compatible clients (like `mcporter` and other MCP-enabled assistant
 
 In short: this is the adapter plug. It speaks MCP on one side, Flair JSON:API on the other, and keeps both from spilling tea on the carpet.
 
-This project is community-built and is not affiliated with, endorsed by, or maintained by Flair.
+*Note* This project is not affiliated with, endorsed by, or maintained by Flair in any way. For official support please see Flair (`api.flair.co`)!
 
 ---
 
