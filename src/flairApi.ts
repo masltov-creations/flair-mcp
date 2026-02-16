@@ -64,6 +64,17 @@ const toBool = (value: unknown) => {
   return undefined;
 };
 
+const toNumber = (value: unknown) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+};
+
+const toFahrenheit = (celsius: number) => (celsius * 9) / 5 + 32;
+
 const extractNextLink = (doc: JsonApiDocument) => {
   const fromLinks = doc.links && typeof doc.links === "object" ? (doc.links as Record<string, unknown>).next : undefined;
   const fromMeta = doc.meta && typeof doc.meta === "object" ? (doc.meta as Record<string, unknown>).next : undefined;
@@ -515,6 +526,162 @@ export class FlairApiClient {
       },
       ...(options?.includeRaw ? { raw_by_type: rawByType } : {})
     };
+  }
+
+  async listRoomTemperatures(options?: {
+    structureId?: string;
+    roomId?: string;
+    pageSize?: number;
+    maxStatPages?: number;
+    includeRoomsWithoutStats?: boolean;
+  }) {
+    const roomsResult = await this.listRooms(options?.structureId);
+    let rooms = roomsResult.data;
+    if (options?.roomId) {
+      rooms = rooms.filter((room) => room.id === options.roomId);
+    }
+
+    const roomIds = new Set(rooms.map((room) => room.id));
+    const statsByRoom = await this.getLatestRoomStatsByRoom(roomIds, {
+      pageSize: options?.pageSize,
+      maxPages: options?.maxStatPages
+    });
+
+    const includeRoomsWithoutStats = options?.includeRoomsWithoutStats ?? false;
+    const rows = rooms
+      .map((room) => {
+        const roomAttrs = room.attributes ?? {};
+        const stats = statsByRoom.get(room.id);
+        const tempC = stats?.temperature_c;
+        return compactObject({
+          room_id: room.id,
+          room_name: firstString(roomAttrs, ["name", "display-name", "display_name", "label"]) ?? `Room ${room.id.slice(0, 8)}`,
+          structure_id: getRelationId(room, "structure"),
+          temperature_c: tempC,
+          temperature_f: typeof tempC === "number" ? toFahrenheit(tempC) : undefined,
+          humidity: stats?.humidity,
+          measured_at: stats?.measured_at
+        });
+      })
+      .filter((row) => includeRoomsWithoutStats || typeof row.temperature_c === "number");
+
+    rows.sort((a, b) => String(a.room_name ?? "").localeCompare(String(b.room_name ?? "")));
+
+    return {
+      rooms: rows,
+      summary: {
+        room_count: rows.length,
+        with_temperature: rows.filter((row) => typeof row.temperature_c === "number").length
+      }
+    };
+  }
+
+  async listDeviceRoomTemperatures(options?: {
+    structureId?: string;
+    roomId?: string;
+    resourceTypes?: string[];
+    pageSize?: number;
+    maxItemsPerType?: number;
+    maxStatPages?: number;
+    includeRaw?: boolean;
+  }) {
+    const named = await this.listNamedDevices({
+      structureId: options?.structureId,
+      roomId: options?.roomId,
+      resourceTypes: options?.resourceTypes,
+      pageSize: options?.pageSize,
+      maxItemsPerType: options?.maxItemsPerType,
+      includeRaw: options?.includeRaw
+    });
+
+    const roomsResult = await this.listRooms(options?.structureId);
+    let rooms = roomsResult.data;
+    if (options?.roomId) {
+      rooms = rooms.filter((room) => room.id === options.roomId);
+    }
+    const roomNameById = new Map(
+      rooms.map((room) => {
+        const attrs = room.attributes ?? {};
+        const roomName = firstString(attrs, ["name", "display-name", "display_name", "label"]) ?? `Room ${room.id.slice(0, 8)}`;
+        return [room.id, roomName];
+      })
+    );
+
+    const relevantRoomIds = new Set(
+      named.devices
+        .map((device) => (typeof device.room_id === "string" ? device.room_id : undefined))
+        .filter((roomId): roomId is string => typeof roomId === "string" && roomId.length > 0)
+    );
+
+    const statsByRoom = await this.getLatestRoomStatsByRoom(relevantRoomIds, {
+      pageSize: options?.pageSize,
+      maxPages: options?.maxStatPages
+    });
+
+    const devices = named.devices.map((device) => {
+      const roomId = typeof device.room_id === "string" ? device.room_id : undefined;
+      const stats = roomId ? statsByRoom.get(roomId) : undefined;
+      const tempC = stats?.temperature_c;
+      return compactObject({
+        ...device,
+        room_name: roomId ? roomNameById.get(roomId) : undefined,
+        room_temperature_c: tempC,
+        room_temperature_f: typeof tempC === "number" ? toFahrenheit(tempC) : undefined,
+        room_humidity: stats?.humidity,
+        room_measured_at: stats?.measured_at
+      });
+    });
+
+    return {
+      devices,
+      summary: {
+        ...named.summary,
+        with_room_temperature: devices.filter((device) => typeof device.room_temperature_c === "number").length
+      },
+      ...(options?.includeRaw && named.raw_by_type ? { raw_by_type: named.raw_by_type } : {})
+    };
+  }
+
+  private async getLatestRoomStatsByRoom(
+    roomIds: Set<string>,
+    options?: { pageSize?: number; maxPages?: number }
+  ): Promise<Map<string, { temperature_c?: number; humidity?: number; measured_at?: string }>> {
+    const path = await this.resolveResourcePath("room-stats");
+    const pageSize = options?.pageSize ?? 200;
+    const maxPages = options?.maxPages ?? 10;
+    const statsByRoom = new Map<string, { temperature_c?: number; humidity?: number; measured_at?: string }>();
+
+    for (let page = 1; page <= maxPages; page += 1) {
+      const doc = await this.requestJsonApi("GET", path, {
+        query: {
+          "page[number]": String(page),
+          "page[size]": String(pageSize),
+          sort: "-created-at"
+        }
+      });
+
+      const rows = Array.isArray(doc.data) ? doc.data : doc.data ? [doc.data] : [];
+      for (const row of rows) {
+        const attrs = row.attributes ?? {};
+        const roomId = firstString(attrs, ["room-id"]) ?? getRelationId(row, "room");
+        if (!roomId) continue;
+        if (roomIds.size > 0 && !roomIds.has(roomId)) continue;
+        if (statsByRoom.has(roomId)) continue;
+
+        statsByRoom.set(roomId, {
+          temperature_c: toNumber(attrs["temperature-c"]),
+          humidity: toNumber(attrs.humidity),
+          measured_at: firstString(attrs, ["created-at", "updated-at"])
+        });
+      }
+
+      if (roomIds.size > 0 && statsByRoom.size >= roomIds.size) break;
+      if (rows.length < pageSize) break;
+      const next = extractNextLink(doc);
+      if (!next) break;
+    }
+
+    return statsByRoom;
   }
 
   private createResourceQuery(options?: {

@@ -58,6 +58,24 @@ const listNamedDevicesSchema = {
   include_raw: z.boolean().optional().default(false)
 };
 
+const listRoomTemperaturesSchema = {
+  structure_id: id.optional(),
+  room_id: id.optional(),
+  page_size: z.number().int().positive().max(500).optional().default(200),
+  max_stat_pages: z.number().int().positive().max(30).optional().default(10),
+  include_rooms_without_stats: z.boolean().optional().default(false)
+};
+
+const listDeviceRoomTemperaturesSchema = {
+  structure_id: id.optional(),
+  room_id: id.optional(),
+  resource_types: z.array(namedDeviceType).optional(),
+  page_size: z.number().int().positive().max(500).optional().default(200),
+  max_items_per_type: z.number().int().positive().max(5000).optional().default(200),
+  max_stat_pages: z.number().int().positive().max(30).optional().default(10),
+  include_raw: z.boolean().optional().default(false)
+};
+
 const updateResourceSchema = {
   resource_type: resourceType,
   resource_id: id,
@@ -147,6 +165,30 @@ export function createFlairMcpServer(flairApi: FlairApiClient) {
       resourceTypes: input.resource_types,
       pageSize: input.page_size,
       maxItemsPerType: input.max_items_per_type,
+      includeRaw: input.include_raw
+    });
+    return toJsonOutput(data);
+  });
+
+  server.tool("list_room_temperatures", listRoomTemperaturesSchema, async (input) => {
+    const data = await flairApi.listRoomTemperatures({
+      structureId: input.structure_id,
+      roomId: input.room_id,
+      pageSize: input.page_size,
+      maxStatPages: input.max_stat_pages,
+      includeRoomsWithoutStats: input.include_rooms_without_stats
+    });
+    return toJsonOutput(data);
+  });
+
+  server.tool("list_device_room_temperatures", listDeviceRoomTemperaturesSchema, async (input) => {
+    const data = await flairApi.listDeviceRoomTemperatures({
+      structureId: input.structure_id,
+      roomId: input.room_id,
+      resourceTypes: input.resource_types,
+      pageSize: input.page_size,
+      maxItemsPerType: input.max_items_per_type,
+      maxStatPages: input.max_stat_pages,
       includeRaw: input.include_raw
     });
     return toJsonOutput(data);
