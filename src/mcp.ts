@@ -43,8 +43,8 @@ const listDevicesSchema = {
   structure_id: id.optional(),
   room_id: id.optional(),
   active_only: z.boolean().optional().default(false),
-  page_size: z.number().int().positive().max(500).optional(),
-  max_items: z.number().int().positive().max(5000).optional(),
+  page_size: z.number().int().positive().max(500).optional().default(100),
+  max_items: z.number().int().positive().max(5000).optional().default(200),
   include_raw: z.boolean().optional().default(false)
 };
 

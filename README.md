@@ -225,7 +225,7 @@ npx -y mcporter call --server flair --tool list_rooms --args '{"structure_id":"<
 ```
 
 `list_devices` returns a deduplicated `devices` summary with stable names; use `include_raw=true` when you need full raw JSON:API payloads.
-Use `max_items`/`page_size` to keep responses small and fast.
+Default fetch limits are `page_size=100` and `max_items=200`; tune `max_items`/`page_size` as needed.
 
 ## Keep Skill In Sync
 
