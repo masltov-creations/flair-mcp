@@ -22,6 +22,7 @@ Use Flair MCP safely to inspect structures/rooms/vents/devices and perform contr
 
 ## Safety Rules
 - Treat all write tools as change-management actions.
+- Confirm setup permission mode (`read` vs `write`) before requesting write tools.
 - Run dry-run options before writes.
 - Never expose client secrets or tokens in output.
 
@@ -30,3 +31,4 @@ Use Flair MCP safely to inspect structures/rooms/vents/devices and perform contr
 - `401/403` upstream: verify Flair client credentials.
 - Timeouts: increase client timeout and inspect `/healthz?deep=1`.
 - If `list_devices` needs raw payloads, call with `{"include_raw": true}`.
+- For faster responses, add `{"max_items": <n>, "page_size": <n>}`.

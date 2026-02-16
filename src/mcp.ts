@@ -10,6 +10,7 @@ const listResourcesSchema = {
   resource_type: resourceType,
   page_number: z.number().int().positive().optional(),
   page_size: z.number().int().positive().max(500).optional(),
+  max_items: z.number().int().positive().max(5000).optional(),
   sort: z.string().optional(),
   include: z.string().optional(),
   filters: z.record(z.union([z.string(), z.number(), z.boolean()])).optional()
@@ -42,6 +43,8 @@ const listDevicesSchema = {
   structure_id: id.optional(),
   room_id: id.optional(),
   active_only: z.boolean().optional().default(false),
+  page_size: z.number().int().positive().max(500).optional(),
+  max_items: z.number().int().positive().max(5000).optional(),
   include_raw: z.boolean().optional().default(false)
 };
 
@@ -112,7 +115,9 @@ export function createFlairMcpServer(flairApi: FlairApiClient) {
     const data = await flairApi.listDevices({
       structureId: input.structure_id,
       roomId: input.room_id,
-      activeOnly: input.active_only
+      activeOnly: input.active_only,
+      pageSize: input.page_size,
+      maxItems: input.max_items
     });
 
     if (!input.include_raw) {
@@ -129,6 +134,7 @@ export function createFlairMcpServer(flairApi: FlairApiClient) {
     const data = await flairApi.listResources(input.resource_type, {
       pageNumber: input.page_number,
       pageSize: input.page_size,
+      maxItems: input.max_items,
       sort: input.sort,
       include: input.include,
       filters: input.filters

@@ -64,6 +64,31 @@ const toBool = (value: unknown) => {
   return undefined;
 };
 
+const extractNextLink = (doc: JsonApiDocument) => {
+  const fromLinks = doc.links && typeof doc.links === "object" ? (doc.links as Record<string, unknown>).next : undefined;
+  const fromMeta = doc.meta && typeof doc.meta === "object" ? (doc.meta as Record<string, unknown>).next : undefined;
+  const nextValue = fromLinks ?? fromMeta;
+  if (!nextValue) return undefined;
+  if (typeof nextValue === "string" && nextValue.trim().length > 0) return nextValue.trim();
+  if (typeof nextValue === "object" && nextValue !== null) {
+    const href = (nextValue as Record<string, unknown>).href;
+    if (typeof href === "string" && href.trim().length > 0) return href.trim();
+  }
+  return undefined;
+};
+
+const mergeIncludedResources = (base: JsonApiResource[] | undefined, incoming: JsonApiResource[] | undefined) => {
+  if (!base?.length && !incoming?.length) return undefined;
+  const map = new Map<string, JsonApiResource>();
+  for (const item of base ?? []) {
+    map.set(`${item.type}:${item.id}`, item);
+  }
+  for (const item of incoming ?? []) {
+    map.set(`${item.type}:${item.id}`, item);
+  }
+  return Array.from(map.values());
+};
+
 const dedupeResourcesById = (resources: JsonApiResource[]) => {
   const seen = new Set<string>();
   const unique: JsonApiResource[] = [];
@@ -188,18 +213,48 @@ export class FlairApiClient {
       sort?: string;
       filters?: Record<string, string | number | boolean>;
       include?: string;
+      maxItems?: number;
     }
   ) {
     const path = await this.resolveResourcePath(resourceType);
     const query = this.createResourceQuery(options);
-    const doc = await this.requestJsonApi("GET", path, { query });
+    const maxItems = options?.maxItems && options.maxItems > 0 ? options.maxItems : undefined;
+    let doc = await this.requestJsonApi("GET", path, { query });
 
-    const data = Array.isArray(doc.data) ? doc.data : doc.data ? [doc.data] : [];
+    let data = Array.isArray(doc.data) ? doc.data : doc.data ? [doc.data] : [];
+    let included = doc.included;
+    let pagesFetched = 1;
+    const visitedNext = new Set<string>();
+    let nextLink = extractNextLink(doc);
+
+    while (nextLink && (!maxItems || data.length < maxItems)) {
+      if (visitedNext.has(nextLink)) break;
+      visitedNext.add(nextLink);
+
+      const nextDoc = await this.requestJsonApi("GET", nextLink);
+      const nextData = Array.isArray(nextDoc.data) ? nextDoc.data : nextDoc.data ? [nextDoc.data] : [];
+      data = data.concat(nextData);
+      included = mergeIncludedResources(included, nextDoc.included);
+      doc = {
+        ...doc,
+        links: nextDoc.links ?? doc.links,
+        meta: nextDoc.meta ?? doc.meta
+      };
+      pagesFetched += 1;
+      if (pagesFetched >= 20) break;
+
+      nextLink = extractNextLink(nextDoc);
+    }
+
+    if (maxItems && data.length > maxItems) {
+      data = data.slice(0, maxItems);
+    }
+
     return {
       data,
       meta: doc.meta,
       links: doc.links,
-      included: doc.included
+      included
     };
   }
 
@@ -307,8 +362,17 @@ export class FlairApiClient {
     };
   }
 
-  async listDevices(options?: { structureId?: string; roomId?: string; activeOnly?: boolean }) {
-    const result = await this.listResources("devices");
+  async listDevices(options?: {
+    structureId?: string;
+    roomId?: string;
+    activeOnly?: boolean;
+    pageSize?: number;
+    maxItems?: number;
+  }) {
+    const result = await this.listResources("devices", {
+      pageSize: options?.pageSize,
+      maxItems: options?.maxItems
+    });
 
     let filtered = result.data;
     if (options?.structureId) {
