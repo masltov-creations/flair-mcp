@@ -106,31 +106,48 @@ const dedupeResourcesById = (resources: JsonApiResource[]) => {
   return { unique, duplicates };
 };
 
-const deviceDisplayName = (resource: JsonApiResource) => {
+const resolveDeviceName = (resource: JsonApiResource) => {
   const attrs = resource.attributes ?? {};
   const explicit = firstString(attrs, ["name", "display-name", "display_name", "label", "title"]);
-  if (explicit) return explicit;
+  if (explicit) return { name: explicit, source: "api" as const };
 
   const manufacturer = firstString(attrs, ["manufacturer", "brand", "device-brand-name"]);
   const model = firstString(attrs, ["model", "model-name", "model_name", "device-model"]);
   if (manufacturer || model) {
-    return [manufacturer, model].filter(Boolean).join(" ");
+    return {
+      name: [manufacturer, model].filter(Boolean).join(" "),
+      source: "derived" as const
+    };
   }
 
-  return `Device ${resource.id.slice(0, 8)}`;
+  return { name: `Device ${resource.id.slice(0, 8)}`, source: "derived" as const };
 };
 
 const withDeviceFallbackName = (resource: JsonApiResource): JsonApiResource => {
   const attrs = { ...(resource.attributes ?? {}) };
-  const explicit = firstString(attrs, ["name", "display-name", "display_name", "label", "title"]);
-  if (!explicit) {
-    attrs.name = deviceDisplayName(resource);
+  const resolved = resolveDeviceName(resource);
+  if (!firstString(attrs, ["name", "display-name", "display_name", "label", "title"])) {
+    attrs.name = resolved.name;
   }
   return {
     ...resource,
     attributes: attrs
   };
 };
+
+const resolveResourceName = (resource: JsonApiResource, fallbackPrefix: string) => {
+  const attrs = resource.attributes ?? {};
+  const explicit = firstString(attrs, ["name", "display-name", "display_name", "label", "title"]);
+  if (explicit) return { name: explicit, source: "api" as const };
+  return { name: `${fallbackPrefix} ${resource.id.slice(0, 8)}`, source: "derived" as const };
+};
+
+const titleCase = (value: string) =>
+  value
+    .split(/[-_ ]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 
 const compactObject = <T extends Record<string, unknown>>(value: T) => {
   return Object.fromEntries(Object.entries(value).filter(([, v]) => typeof v !== "undefined")) as T;
@@ -390,12 +407,14 @@ export class FlairApiClient {
 
     const { unique, duplicates } = dedupeResourcesById(filtered);
     const normalized = unique.map((item) => withDeviceFallbackName(item));
-    const devices = normalized.map((item) => {
+    const devices = unique.map((item) => {
       const attrs = item.attributes ?? {};
+      const resolved = resolveDeviceName(item);
       return compactObject({
         id: item.id,
         type: item.type,
-        name: deviceDisplayName(item),
+        name: resolved.name,
+        name_source: resolved.source,
         structure_id: getRelationId(item, "structure"),
         room_id: getRelationId(item, "room"),
         active: toBool(attrs["active"] ?? attrs["is-active"]),
@@ -407,12 +426,94 @@ export class FlairApiClient {
 
     return {
       ...result,
-      data: normalized,
+      data: unique,
+      normalized_data: normalized,
       devices,
       summary: {
         count: devices.length,
         duplicatesRemoved: duplicates
       }
+    };
+  }
+
+  async listNamedDevices(options?: {
+    structureId?: string;
+    roomId?: string;
+    resourceTypes?: string[];
+    pageSize?: number;
+    maxItemsPerType?: number;
+    includeRaw?: boolean;
+  }) {
+    const requestedTypes =
+      options?.resourceTypes && options.resourceTypes.length > 0
+        ? options.resourceTypes
+        : ["vents", "pucks", "thermostats", "remote-sensors", "puck2s"];
+
+    const pageSize = options?.pageSize ?? 100;
+    const maxItemsPerType = options?.maxItemsPerType ?? 200;
+
+    const devices: Array<Record<string, unknown>> = [];
+    const byType: Record<string, { count: number; duplicatesRemoved: number }> = {};
+    const rawByType: Record<string, JsonApiResource[]> = {};
+
+    for (const type of requestedTypes) {
+      const result = await this.listResources(type, {
+        pageSize,
+        maxItems: maxItemsPerType
+      });
+
+      let filtered = result.data;
+      if (options?.structureId) {
+        filtered = filtered.filter((item) => relationContainsId(item, "structure", options.structureId!));
+      }
+      if (options?.roomId) {
+        filtered = filtered.filter((item) => relationContainsId(item, "room", options.roomId!));
+      }
+
+      const { unique, duplicates } = dedupeResourcesById(filtered);
+      byType[type] = {
+        count: unique.length,
+        duplicatesRemoved: duplicates
+      };
+
+      if (options?.includeRaw) {
+        rawByType[type] = unique;
+      }
+
+      for (const item of unique) {
+        const attrs = item.attributes ?? {};
+        const resolved = resolveResourceName(item, titleCase(type.replace(/s$/, "")));
+        devices.push(
+          compactObject({
+            id: item.id,
+            resource_type: type,
+            name: resolved.name,
+            name_source: resolved.source,
+            structure_id: getRelationId(item, "structure"),
+            room_id: getRelationId(item, "room"),
+            active: toBool(attrs["active"] ?? attrs["is-active"]),
+            online: toBool(attrs["online"] ?? attrs["is-online"])
+          })
+        );
+      }
+    }
+
+    devices.sort((a, b) => {
+      const typeA = String(a.resource_type ?? "");
+      const typeB = String(b.resource_type ?? "");
+      if (typeA !== typeB) return typeA.localeCompare(typeB);
+      const nameA = String(a.name ?? "");
+      const nameB = String(b.name ?? "");
+      return nameA.localeCompare(nameB);
+    });
+
+    return {
+      devices,
+      summary: {
+        count: devices.length,
+        by_type: byType
+      },
+      ...(options?.includeRaw ? { raw_by_type: rawByType } : {})
     };
   }
 

@@ -48,6 +48,16 @@ const listDevicesSchema = {
   include_raw: z.boolean().optional().default(false)
 };
 
+const namedDeviceType = z.enum(["vents", "pucks", "puck2s", "thermostats", "remote-sensors", "devices"]);
+const listNamedDevicesSchema = {
+  structure_id: id.optional(),
+  room_id: id.optional(),
+  resource_types: z.array(namedDeviceType).optional(),
+  page_size: z.number().int().positive().max(500).optional().default(100),
+  max_items_per_type: z.number().int().positive().max(5000).optional().default(200),
+  include_raw: z.boolean().optional().default(false)
+};
+
 const updateResourceSchema = {
   resource_type: resourceType,
   resource_id: id,
@@ -127,6 +137,18 @@ export function createFlairMcpServer(flairApi: FlairApiClient) {
       });
     }
 
+    return toJsonOutput(data);
+  });
+
+  server.tool("list_named_devices", listNamedDevicesSchema, async (input) => {
+    const data = await flairApi.listNamedDevices({
+      structureId: input.structure_id,
+      roomId: input.room_id,
+      resourceTypes: input.resource_types,
+      pageSize: input.page_size,
+      maxItemsPerType: input.max_items_per_type,
+      includeRaw: input.include_raw
+    });
     return toJsonOutput(data);
   });
 
