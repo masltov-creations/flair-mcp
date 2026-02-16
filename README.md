@@ -144,7 +144,17 @@ cp .env.example .env
 ```bash
 ./scripts/setup.sh
 ```
-The setup script can auto-detect your existing SmartThings MCP (shameless plug: https://github.com/masltov-creations/smartthings-mcp)  repo and offer to register Flair as a gateway upstream.
+Setup automation now includes:
+- dependency install + build
+- optional systemd service install/restart
+- optional OpenClaw skill install (workspace + global path)
+- optional `mcporter` register + verification
+- optional SmartThings gateway upstream integration
+- startup health wait + deep health probe
+
+The setup script can auto-detect your existing SmartThings MCP
+(`https://github.com/masltov-creations/smartthings-mcp`) repo and offer to
+register Flair as a gateway upstream.
 
 5. Verify service + upstream API health:
 
@@ -153,6 +163,14 @@ curl -sS "http://localhost:8090/healthz?deep=1"
 ```
 
 ---
+
+Other setup automation flags:
+- `INSTALL_SYSTEMD=true|false`
+- `INSTALL_OPENCLAW_SKILL=true|false`
+- `CONFIGURE_MCPORTER=true|false`
+- `VERIFY_MCPORTER=true|false`
+- `FORCE_REENTER_CREDS=true|false`
+- `STARTUP_HEALTH_TIMEOUT_SEC=90`
 
 ## mcporter Usage
 
