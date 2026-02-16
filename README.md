@@ -191,6 +191,32 @@ Other setup automation flags:
 - `SMARTTHINGS_UPSTREAM_NAME=flair`
 - `RESTART_SMARTTHINGS_SERVICE=true|false`
 
+Setup switch examples:
+
+```bash
+# Read-only install (safe default)
+FLAIR_PERMISSION_MODE=read INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh
+
+# Enable write tools during setup
+FLAIR_PERMISSION_MODE=write INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh
+```
+
+Change permission mode after setup:
+
+```bash
+# Turn write ON after setup
+FLAIR_PERMISSION_MODE=write INSTALL_SYSTEMD=false INSTALL_OPENCLAW_SKILL=false CONFIGURE_MCPORTER=false INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh && sudo systemctl restart flair-mcp
+
+# Turn write OFF after setup
+FLAIR_PERMISSION_MODE=read INSTALL_SYSTEMD=false INSTALL_OPENCLAW_SKILL=false CONFIGURE_MCPORTER=false INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh && sudo systemctl restart flair-mcp
+```
+
+Quick check:
+
+```bash
+curl -sS http://127.0.0.1:8090/healthz | grep -o '"writeToolsEnabled":[^,}]*'
+```
+
 Safe default note:
 - SmartThings gateway integration now defaults to **off** unless explicitly enabled.
 
