@@ -35,6 +35,15 @@ read_env() {
   grep -E "^${key}=" "$ROOT_DIR/.env" | head -n1 | cut -d= -f2-
 }
 
+read_env_file() {
+  local file="$1"
+  local key="$2"
+  if [ ! -f "$file" ]; then
+    return
+  fi
+  grep -E "^${key}=" "$file" | head -n1 | cut -d= -f2-
+}
+
 update_env() {
   local key="$1"
   local value="$2"
@@ -133,6 +142,122 @@ configure_mcporter() {
   fi
 }
 
+detect_smartthings_mcp_dir() {
+  local explicit="${SMARTTHINGS_MCP_DIR:-}"
+  if [ -n "$explicit" ] && [ -d "$explicit" ]; then
+    printf "%s" "$explicit"
+    return
+  fi
+
+  local candidates=(
+    "/mnt/d/Dev/SmartThingsMCP"
+    "/mnt/d/Dev/smartthings-mcp"
+    "$ROOT_DIR/../SmartThingsMCP"
+    "$ROOT_DIR/../smartthings-mcp"
+    "$HOME/smartthings-mcp"
+  )
+
+  for dir in "${candidates[@]}"; do
+    if [ -f "$dir/scripts/manage-upstreams.sh" ] && [ -f "$dir/.env" ]; then
+      printf "%s" "$dir"
+      return
+    fi
+  done
+}
+
+integrate_smartthings_gateway() {
+  local st_dir="$1"
+  local st_env="$st_dir/.env"
+  local upstream_name="${SMARTTHINGS_UPSTREAM_NAME:-flair}"
+
+  if [ ! -f "$st_env" ]; then
+    warn "SmartThings MCP .env not found at $st_env; skipping gateway integration"
+    return
+  fi
+
+  local gateway_enabled
+  gateway_enabled=$(read_env_file "$st_env" MCP_GATEWAY_ENABLED || true)
+  gateway_enabled=$(printf "%s" "$gateway_enabled" | tr '[:upper:]' '[:lower:]')
+  if [ "$gateway_enabled" != "true" ] && [ "$gateway_enabled" != "1" ] && [ "$gateway_enabled" != "yes" ] && [ "$gateway_enabled" != "y" ]; then
+    warn "SmartThings MCP gateway appears disabled (MCP_GATEWAY_ENABLED=${gateway_enabled:-unset})."
+    warn "Integration will still write upstream config, but gateway calls will not work until SmartThings gateway mode is enabled."
+  fi
+
+  local st_upstreams_path flair_port flair_mcp_path flair_url
+  st_upstreams_path=$(read_env_file "$st_env" UPSTREAMS_CONFIG_PATH || true)
+  st_upstreams_path=${st_upstreams_path:-$st_dir/config/upstreams.json}
+
+  flair_port=$(read_env PORT || true)
+  flair_port=${flair_port:-8090}
+  flair_mcp_path=$(read_env MCP_HTTP_PATH || true)
+  flair_mcp_path=${flair_mcp_path:-/mcp}
+  flair_url="http://localhost:${flair_port}${flair_mcp_path}"
+
+  mkdir -p "$(dirname "$st_upstreams_path")"
+
+  if node - "$st_upstreams_path" "$upstream_name" "$flair_url" <<'NODE'
+const fs = require("fs");
+const path = process.argv[2];
+const name = process.argv[3];
+const url = process.argv[4];
+
+let doc = { upstreams: [] };
+if (fs.existsSync(path)) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(path, "utf8"));
+    if (parsed && typeof parsed === "object" && Array.isArray(parsed.upstreams)) {
+      doc = parsed;
+    }
+  } catch {
+    // If existing file is invalid JSON, fail hard to avoid destructive overwrite.
+    console.error(`Invalid JSON in ${path}`);
+    process.exit(1);
+  }
+}
+
+const next = {
+  name,
+  url,
+  description: "Local Flair MCP",
+  enabled: true
+};
+
+const index = doc.upstreams.findIndex((u) => u && u.name === name);
+if (index >= 0) {
+  doc.upstreams[index] = { ...doc.upstreams[index], ...next };
+} else {
+  doc.upstreams.push(next);
+}
+
+fs.writeFileSync(path, JSON.stringify(doc, null, 2) + "\n");
+console.log(`Upstream ${name} -> ${url} written to ${path}`);
+NODE
+  then
+    log "Integrated Flair into SmartThings upstream config: $st_upstreams_path"
+  else
+    warn "Failed to update SmartThings upstream config at $st_upstreams_path"
+    return
+  fi
+
+  local restart_value="${RESTART_SMARTTHINGS_SERVICE:-}"
+  if [ -z "$restart_value" ] && [ -t 0 ]; then
+    read -rp "Restart smartthings-mcp.service now to pick up new upstream? [Y/n]: " restart_value
+  fi
+  restart_value=${restart_value:-y}
+
+  if ! is_no "$restart_value"; then
+    if command -v systemctl >/dev/null 2>&1; then
+      if sudo systemctl restart smartthings-mcp.service; then
+        log "Restarted smartthings-mcp.service"
+      else
+        warn "Could not restart smartthings-mcp.service (you can restart it manually)"
+      fi
+    else
+      warn "systemctl not found; restart smartthings-mcp.service manually"
+    fi
+  fi
+}
+
 main() {
   require_cmd node
   require_cmd npm
@@ -182,6 +307,23 @@ main() {
     configure_mcporter
   else
     log "Skipping mcporter configuration"
+  fi
+
+  local smartthings_dir
+  smartthings_dir=$(detect_smartthings_mcp_dir || true)
+  if [ -n "$smartthings_dir" ]; then
+    INTEGRATE_SMARTTHINGS_GATEWAY=${INTEGRATE_SMARTTHINGS_GATEWAY:-}
+    if [ -z "$INTEGRATE_SMARTTHINGS_GATEWAY" ] && [ -t 0 ]; then
+      read -rp "Detected SmartThings MCP at $smartthings_dir. Add/refresh Flair upstream there now? [Y/n]: " INTEGRATE_SMARTTHINGS_GATEWAY
+    fi
+    INTEGRATE_SMARTTHINGS_GATEWAY=${INTEGRATE_SMARTTHINGS_GATEWAY:-y}
+    if ! is_no "$INTEGRATE_SMARTTHINGS_GATEWAY"; then
+      integrate_smartthings_gateway "$smartthings_dir"
+    else
+      log "Skipping SmartThings gateway integration"
+    fi
+  else
+    log "No SmartThings MCP repo detected; skipping gateway integration"
   fi
 
   local port health_path
