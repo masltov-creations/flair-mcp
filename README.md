@@ -159,6 +159,7 @@ Setup automation now includes:
 - optional `mcporter` register + verification
 - optional SmartThings gateway upstream integration
 - startup health wait + deep health probe
+- permission switch (`read` or `write`) for MCP tool access
 
 OAuth behavior you should expect:
 - This is OAuth2 `client_credentials`.
@@ -184,6 +185,7 @@ Other setup automation flags:
 - `VERIFY_MCPORTER=true|false`
 - `FORCE_REENTER_CREDS=true|false`
 - `STARTUP_HEALTH_TIMEOUT_SEC=90`
+- `FLAIR_PERMISSION_MODE=read|write` (maps to `WRITE_TOOLS_ENABLED`)
 - `INTEGRATE_SMARTTHINGS_GATEWAY=true|false`
 - `SMARTTHINGS_MCP_DIR=/home/<you>/apps/smartthings-mcp`
 - `SMARTTHINGS_UPSTREAM_NAME=flair`
@@ -217,11 +219,13 @@ Example calls:
 ```bash
 npx -y mcporter call --server flair --tool list_structures --output json
 npx -y mcporter call --server flair --tool list_devices --output json
+npx -y mcporter call --server flair --tool list_devices --args '{"max_items":50,"page_size":50}' --output json
 npx -y mcporter call --server flair --tool list_devices --args '{"include_raw":true}' --output json
 npx -y mcporter call --server flair --tool list_rooms --args '{"structure_id":"<structure-id>"}' --output json
 ```
 
 `list_devices` returns a deduplicated `devices` summary with stable names; use `include_raw=true` when you need full raw JSON:API payloads.
+Use `max_items`/`page_size` to keep responses small and fast.
 
 ## Keep Skill In Sync
 

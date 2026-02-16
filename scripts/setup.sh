@@ -26,6 +26,17 @@ is_no() {
   esac
 }
 
+to_bool_flag() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|y|on)
+      printf "true"
+      ;;
+    *)
+      printf "false"
+      ;;
+  esac
+}
+
 require_wsl_systemd() {
   if ! is_wsl; then
     return
@@ -308,6 +319,57 @@ configure_credentials() {
   update_env FLAIR_CLIENT_SECRET "$client_secret"
 }
 
+configure_permissions() {
+  local mode="${FLAIR_PERMISSION_MODE:-${FLAIR_PERMISSIONS:-}}"
+  local current current_mode
+  current=$(to_bool_flag "$(read_env WRITE_TOOLS_ENABLED || true)")
+  if [ "$current" = "true" ]; then
+    current_mode="write"
+  else
+    current_mode="read"
+  fi
+
+  if [ -n "$mode" ]; then
+    mode=$(printf "%s" "$mode" | tr '[:upper:]' '[:lower:]')
+    case "$mode" in
+      read|readonly|ro)
+        mode="read"
+        ;;
+      write|readwrite|rw)
+        mode="write"
+        ;;
+      *)
+        fail "Invalid FLAIR_PERMISSION_MODE: $mode (use read|write)"
+        ;;
+    esac
+  elif [ -t 0 ]; then
+    read -rp "Flair MCP permissions ([r]ead/[w]rite) [${current_mode}]: " mode
+    mode=${mode:-$current_mode}
+    mode=$(printf "%s" "$mode" | tr '[:upper:]' '[:lower:]')
+    case "$mode" in
+      r|read|readonly|ro)
+        mode="read"
+        ;;
+      w|write|readwrite|rw)
+        mode="write"
+        ;;
+      *)
+        fail "Invalid selection: $mode (use read or write)"
+        ;;
+    esac
+  else
+    mode="$current_mode"
+  fi
+
+  if [ "$mode" = "write" ]; then
+    update_env WRITE_TOOLS_ENABLED "true"
+    log "Permission mode: write (read + write tools enabled)"
+  else
+    update_env WRITE_TOOLS_ENABLED "false"
+    log "Permission mode: read (write tools disabled)"
+  fi
+}
+
 install_systemd_service() {
   require_cmd systemctl
   local node_bin
@@ -498,6 +560,7 @@ main() {
   fi
 
   configure_credentials
+  configure_permissions
 
   cd "$ROOT_DIR"
   if [ -f package-lock.json ]; then
