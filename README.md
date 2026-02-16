@@ -7,6 +7,8 @@ It gives MCP-compatible clients (like `mcporter` and other MCP-enabled assistant
 
 In short: this is the adapter plug. It speaks MCP on one side, Flair JSON:API on the other, and keeps both from spilling tea on the carpet.
 
+This project is community-built and is not affiliated with, endorsed by, or maintained by Flair.
+
 ---
 
 ## Why This Exists (Purpose of the Plug)
@@ -56,6 +58,13 @@ So yes, by default this server is more “careful librarian” than “chaotic w
 - A Flair OAuth client with:
   - `FLAIR_CLIENT_ID`
   - `FLAIR_CLIENT_SECRET`
+
+### Getting Flair API Access
+Use Flair's official channels to request API credentials:
+- API overview and prerequisites: https://support.flair.co/hc/en-us/articles/360000523252-Does-Flair-have-an-API
+- Flair API access request form: https://forms.gle/VohiQjWNv9CAP2ASA
+
+Per Flair's support article, you should complete app/account/home setup first, then submit the request form using the same Flair account email.
 
 ### Strongly recommended
 - Restrictive host/origin allowlists
