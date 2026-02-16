@@ -178,17 +178,6 @@ npx -y mcporter call --server flair --tool list_rooms --args '{"structure_id":"<
 
 ---
 
-## Team Sharing Checklist
-
-1. Keep `.env` out of git.
-2. Use dedicated OAuth clients per environment.
-3. Keep write tools disabled unless truly needed.
-4. Restrict host/origin allowlists.
-5. Use HTTPS for any remote access.
-6. Monitor `/healthz?deep=1` and logs.
-
----
-
 ## Security Notes
 
 - OAuth secrets are loaded from environment only.
