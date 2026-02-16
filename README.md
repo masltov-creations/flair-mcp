@@ -152,50 +152,55 @@ WRITE_TOOLS_ENABLED=true
 
 ## Quick Start (WSL/Linux)
 
+If you already ran **Start Here (60 Seconds)**, this is the detailed version.
+
 Recommended layout (keeps source and runtime isolated):
 - Source clone: your dev workspace (for edits/PRs)
 - Runtime install: `/home/<you>/apps/flair-mcp` (for systemd + secrets)
 
-Fast start (clone/update + setup in one command):
+1. Clone (or update) the runtime install:
 
 ```bash
-mkdir -p /home/$USER/apps && ( [ -d /home/$USER/apps/flair-mcp/.git ] && git -C /home/$USER/apps/flair-mcp pull --ff-only origin main || git clone https://github.com/masltov-creations/flair-mcp /home/$USER/apps/flair-mcp ) && cd /home/$USER/apps/flair-mcp && bash ./scripts/setup.sh
+mkdir -p /home/$USER/apps && ( [ -d /home/$USER/apps/flair-mcp/.git ] && git -C /home/$USER/apps/flair-mcp pull --ff-only origin main || git clone https://github.com/masltov-creations/flair-mcp /home/$USER/apps/flair-mcp ) && cd /home/$USER/apps/flair-mcp
 ```
 
-What setup will do automatically:
-- create `.env` from `.env.example` if missing
-- prompt for Flair credentials, or offer to reuse existing values
-- prompt for permission mode (`read` or `write`)
-- offer optional systemd/OpenClaw/mcporter/SmartThings integration steps
-- run startup health checks
+2. Run setup:
+
+```bash
+bash ./scripts/setup.sh
+```
+
+3. Setup prompts to expect:
+- credentials: it asks for `FLAIR_CLIENT_ID` / `FLAIR_CLIENT_SECRET`, or offers to reuse current values
+- permissions: choose `read` (safe default) or `write`
+- optional integration prompts: systemd, OpenClaw skill install, mcporter config, and parallel SmartThings gateway wiring
+- startup checks: it waits for health and runs a deep health probe
 
 You can rerun the same command after partial/failed setup; it is designed to be idempotent.
-
-Setup automation now includes:
-- dependency install + build
-- optional systemd service install/restart
-- optional OpenClaw skill install (workspace + global path)
-- optional `mcporter` register + verification
-- optional SmartThings gateway upstream integration
-- startup health wait + deep health probe
-- permission switch (`read` or `write`) for MCP tool access
 
 OAuth behavior you should expect:
 - This is OAuth2 `client_credentials`.
 - Setup does **not** open a browser auth URL.
 - Token fetch/refresh is automatic once `FLAIR_CLIENT_ID` and `FLAIR_CLIENT_SECRET` are valid.
 
-Parallel MCP integration (optional):
+4. Verify local service and auth:
+
+```bash
+curl -sS "http://127.0.0.1:8090/healthz?deep=1"
+```
+
+5. Verify MCP tools and named devices:
+
+```bash
+npx -y mcporter list flair --schema
+npx -y mcporter call --server flair --tool list_named_devices --output json
+```
+
+Parallel MCP integration (optional, separate project):
 - The setup script can auto-detect your separate SmartThings MCP project
   (`https://github.com/masltov-creations/smartthings-mcp`) and offer to register Flair as a gateway upstream there.
 - This is cross-project wiring, not part of Flair MCP core runtime.
 - Default is off unless you explicitly enable it.
-
-Verify service + upstream API health:
-
-```bash
-curl -sS "http://localhost:8090/healthz?deep=1"
-```
 
 ---
 
@@ -212,31 +217,7 @@ Other setup automation flags:
 - `SMARTTHINGS_UPSTREAM_NAME=flair`
 - `RESTART_SMARTTHINGS_SERVICE=true|false`
 
-Setup switch examples:
-
-```bash
-# Read-only install (safe default)
-FLAIR_PERMISSION_MODE=read INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh
-
-# Enable write tools during setup
-FLAIR_PERMISSION_MODE=write INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh
-```
-
-Change permission mode after setup:
-
-```bash
-# Turn write ON after setup
-FLAIR_PERMISSION_MODE=write INSTALL_SYSTEMD=false INSTALL_OPENCLAW_SKILL=false CONFIGURE_MCPORTER=false INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh && sudo systemctl restart flair-mcp
-
-# Turn write OFF after setup
-FLAIR_PERMISSION_MODE=read INSTALL_SYSTEMD=false INSTALL_OPENCLAW_SKILL=false CONFIGURE_MCPORTER=false INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh && sudo systemctl restart flair-mcp
-```
-
-Quick check:
-
-```bash
-curl -sS http://127.0.0.1:8090/healthz | grep -o '"writeToolsEnabled":[^,}]*'
-```
+For practical write/read toggles and safe reruns, see **Common Changes** below.
 
 ## Common Changes
 
@@ -250,6 +231,12 @@ Change back to read-only:
 
 ```bash
 cd /home/$USER/apps/flair-mcp && FLAIR_PERMISSION_MODE=read INSTALL_SYSTEMD=false INSTALL_OPENCLAW_SKILL=false CONFIGURE_MCPORTER=false INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh && sudo systemctl restart flair-mcp
+```
+
+Check current write/read state:
+
+```bash
+curl -sS http://127.0.0.1:8090/healthz | grep -o '"writeToolsEnabled":[^,}]*'
 ```
 
 Re-run setup safely after partial/failed run:
