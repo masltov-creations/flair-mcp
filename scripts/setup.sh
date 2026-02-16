@@ -336,7 +336,7 @@ detect_smartthings_mcp_dir() {
   fi
 
   local candidates=(
-    "/mnt/d/Dev/SmartThingsMCP"
+    "/mnt/c/Dev/SmartThingsMCP"
     "/mnt/d/Dev/smartthings-mcp"
     "$ROOT_DIR/../SmartThingsMCP"
     "$ROOT_DIR/../smartthings-mcp"
