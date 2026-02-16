@@ -1,27 +1,101 @@
 # Flair MCP
 
-A standalone, security-focused MCP server for the Flair API (`api.flair.co`).
+*A politely paranoid bridge between your AI tools and your Flair home data — now with 30% more British composure.*
 
-This project was built as a human + AI engineering collaboration.
+Flair MCP is a standalone MCP server for the Flair API (`api.flair.co`).
+It gives MCP-compatible clients (like `mcporter` and other MCP-enabled assistants) a safe, practical way to inspect and control Flair resources without handing raw API complexity to every tool call.
 
-## What You Get
-- OAuth2 client-credentials token management with automatic refresh.
-- Streamable HTTP MCP endpoint with session handling built for repeated `mcporter` calls.
-- JSON:API-native tooling for resource discovery and control.
-- Safe-by-default behavior: write tools are disabled unless explicitly enabled.
-- Health endpoint with optional deep API verification.
+In short: this is the adapter plug. It speaks MCP on one side, Flair JSON:API on the other, and keeps both from spilling tea on the carpet.
 
-## Core Endpoints
-- MCP: `POST /mcp`
-- Health: `GET /healthz`
+---
 
-Defaults:
+## Why This Exists (Purpose of the Plug)
+
+If you want an LLM or automation tool to work with Flair, you need four things:
+1. A stable MCP endpoint your tools can call.
+2. OAuth token handling that doesn’t require ritual sacrifice.
+3. Guardrails so read access is easy and write access is deliberate.
+4. Predictable, structured outputs suitable for repeated machine use.
+
+Flair MCP provides exactly that: one server, one config target, and one place to enforce security and behavior.
+
+---
+
+## How It Works (Without Summoning Any Knights)
+
+Flair MCP runs as an HTTP service and exposes two core endpoints:
+
+- MCP endpoint: `POST /mcp`
+- Health endpoint: `GET /healthz`
+
+Default runtime values:
 - Port: `8090`
 - MCP path: `/mcp`
 - Health path: `/healthz`
 
+### Request flow
+1. Your MCP client calls the server at `/mcp`.
+2. The server validates request context and host/origin controls.
+3. It acquires (or reuses) a Flair OAuth2 client-credentials token.
+4. It calls Flair’s JSON:API endpoints.
+5. It returns normalized MCP tool results (without leaking secrets).
+
+### Safety model
+- Read tools are available by default.
+- Write tools are **off** by default.
+- You must explicitly enable writes with `WRITE_TOOLS_ENABLED=true`.
+
+So yes, by default this server is more “careful librarian” than “chaotic wizard.”
+
+---
+
+## What You Need to Make It Work
+
+### Required
+- Node.js + npm
+- A Flair OAuth client with:
+  - `FLAIR_CLIENT_ID`
+  - `FLAIR_CLIENT_SECRET`
+
+### Strongly recommended
+- Restrictive host/origin allowlists
+- Separate OAuth clients per environment (dev/staging/prod)
+- HTTPS via reverse proxy/tunnel if accessed remotely
+
+### Key environment variables
+See `.env.example` for the complete list. Most important:
+
+- `FLAIR_CLIENT_ID`
+- `FLAIR_CLIENT_SECRET`
+- `FLAIR_API_BASE_URL` (default `https://api.flair.co`)
+- `WRITE_TOOLS_ENABLED` (default `false`)
+- `ALLOWED_MCP_HOSTS`
+- `ALLOWED_MCP_ORIGINS`
+
+---
+
+## What It Enables You to Do
+
+With Flair MCP connected, an MCP-capable assistant or tool can:
+
+- Discover Flair resource types and IDs.
+- Enumerate structures, rooms, vents, and devices.
+- Fetch specific resources and relationships.
+- Run health checks for both service liveness and optional deep Flair verification.
+- Optionally perform controlled write operations (when explicitly enabled).
+
+In practical terms, this means you can build assistants that answer things like:
+- “Which rooms are in my structure?”
+- “What vents are currently available?”
+- “Set vent X to 40% open” *(only if writes are enabled)*
+
+You get automation power with intent boundaries, rather than a free-range API free-for-all.
+
+---
+
 ## Supported MCP Tools
-Read tools:
+
+### Read tools
 - `health_check`
 - `list_resource_types`
 - `list_structures`
@@ -32,111 +106,119 @@ Read tools:
 - `get_resource`
 - `get_related_resources`
 
-Optional write tools (disabled by default):
+### Optional write tools (disabled by default)
 - `update_resource_attributes`
 - `create_resource`
 - `set_vent_percent_open`
 
-Enable write tools by setting:
-- `WRITE_TOOLS_ENABLED=true`
+Enable write tools with:
 
-## Quick Start (WSL/Linux)
-1. Clone the repo:
 ```bash
-git clone https://github.com/masltov-creations/flair-mcp && cd flair-mcp
+WRITE_TOOLS_ENABLED=true
 ```
 
-2. Create `.env` and add Flair credentials:
+---
+
+## Quick Start (WSL/Linux)
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/masltov-creations/flair-mcp
+cd flair-mcp
+```
+
+2. Create your environment file:
+
 ```bash
 cp .env.example .env
 ```
-Set:
+
+3. Set required credentials in `.env`:
+
 - `FLAIR_CLIENT_ID`
 - `FLAIR_CLIENT_SECRET`
 
-3. Run setup:
+4. Run setup:
+
 ```bash
 ./scripts/setup.sh
 ```
 The setup script can auto-detect your existing SmartThings MCP repo and offer to register Flair as a gateway upstream.
 
-4. Validate health:
+5. Verify service + upstream API health:
+
 ```bash
 curl -sS "http://localhost:8090/healthz?deep=1"
 ```
 
-## SmartThings Gateway Integration
-If `SmartThingsMCP` is detected, setup offers to add:
-- upstream name: `flair`
-- upstream url: `http://localhost:8090/mcp`
-
-It writes to SmartThings upstream config and can restart `smartthings-mcp.service` so the gateway picks it up.
-
-You can preseed integration behavior:
-- `INTEGRATE_SMARTTHINGS_GATEWAY=true|false`
-- `SMARTTHINGS_MCP_DIR=/path/to/SmartThingsMCP`
-- `SMARTTHINGS_UPSTREAM_NAME=flair`
-- `RESTART_SMARTTHINGS_SERVICE=true|false`
+---
 
 ## mcporter Usage
-Register server:
+
+Register the server:
+
 ```bash
 npx -y mcporter config add flair http://localhost:8090/mcp --allow-http --transport http --scope home
 ```
 
-List tools:
+List available tools:
+
 ```bash
 npx -y mcporter list flair --schema
 ```
 
-Call examples:
+Example calls:
+
 ```bash
 npx -y mcporter call --server flair --tool list_structures --output json
 npx -y mcporter call --server flair --tool list_devices --output json
 npx -y mcporter call --server flair --tool list_rooms --args '{"structure_id":"<structure-id>"}' --output json
 ```
 
-## Environment Variables
-See `.env.example` for full list.
-
-Most important:
-- `FLAIR_CLIENT_ID`
-- `FLAIR_CLIENT_SECRET`
-- `FLAIR_API_BASE_URL` (default `https://api.flair.co`)
-- `WRITE_TOOLS_ENABLED` (default `false`)
-- `ALLOWED_MCP_HOSTS`
-- `ALLOWED_MCP_ORIGINS`
+---
 
 ## Team Sharing Checklist
-1. Keep `.env` out of git (already ignored).
-2. Use a dedicated OAuth client per environment (dev/staging/prod).
-3. Keep write tools disabled for read-only consumers.
-4. Restrict host/origin allowlists in `.env`.
-5. Use a reverse proxy or tunnel with HTTPS for remote access.
+
+1. Keep `.env` out of git.
+2. Use dedicated OAuth clients per environment.
+3. Keep write tools disabled unless truly needed.
+4. Restrict host/origin allowlists.
+5. Use HTTPS for any remote access.
 6. Monitor `/healthz?deep=1` and logs.
 
+---
+
 ## Security Notes
-- Tokens are never returned by MCP tools.
+
 - OAuth secrets are loaded from environment only.
-- Non-2xx Flair responses are normalized and surfaced without secret leakage.
+- Tokens are never returned by MCP tools.
+- Non-2xx Flair responses are normalized and surfaced safely.
 - Host allowlist enforcement is enabled by default.
 
-See:
+Additional docs:
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY.md`
 - `docs/THREAT_MODEL.md`
 
+---
+
 ## Development
+
 ```bash
 npm install
 npm run dev
 ```
 
-Build:
+Build and run:
+
 ```bash
 npm run build
 npm start
 ```
 
+---
+
 ## License
+
 MIT
