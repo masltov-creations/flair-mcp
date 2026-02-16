@@ -1,6 +1,6 @@
 # Flair MCP
 
-A standalone, security-focused MCP server for the Flair API (`api.flair.co`), designed for team use.
+A standalone, security-focused MCP server for the Flair API (`api.flair.co`).
 
 This project was built as a human + AI engineering collaboration.
 
