@@ -172,7 +172,7 @@ Other setup automation flags:
 - `FORCE_REENTER_CREDS=true|false`
 - `STARTUP_HEALTH_TIMEOUT_SEC=90`
 - `INTEGRATE_SMARTTHINGS_GATEWAY=true|false`
-- `SMARTTHINGS_MCP_DIR=/absolute/path/to/SmartThingsMCP`
+- `SMARTTHINGS_MCP_DIR=/home/<you>/apps/smartthings-mcp`
 - `SMARTTHINGS_UPSTREAM_NAME=flair`
 - `RESTART_SMARTTHINGS_SERVICE=true|false`
 

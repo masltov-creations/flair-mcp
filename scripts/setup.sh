@@ -346,12 +346,19 @@ detect_smartthings_mcp_dir() {
   fi
 
   local candidates=(
-    "/mnt/c/Dev/SmartThingsMCP"
-    "/mnt/d/Dev/smartthings-mcp"
+    "$HOME/apps/smartthings-mcp"
+    "$HOME/apps/SmartThingsMCP"
     "$ROOT_DIR/../SmartThingsMCP"
     "$ROOT_DIR/../smartthings-mcp"
+    "$HOME/SmartThingsMCP"
     "$HOME/smartthings-mcp"
   )
+
+  local dev_mount
+  for dev_mount in /mnt/[a-z]/Dev; do
+    [ -d "$dev_mount" ] || continue
+    candidates+=("$dev_mount/smartthings-mcp" "$dev_mount/SmartThingsMCP")
+  done
 
   local dir
   for dir in "${candidates[@]}"; do
