@@ -231,6 +231,12 @@ When `SKILL.md` changes, re-install it into OpenClaw:
 cd /home/$USER/apps/flair-mcp && INSTALL_OPENCLAW_SKILL=true INSTALL_SYSTEMD=false CONFIGURE_MCPORTER=false INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh
 ```
 
+Quick status check:
+
+```bash
+cd /home/$USER/apps/flair-mcp && bash ./scripts/sync-skill.sh
+```
+
 ---
 
 ## Security Notes
