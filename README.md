@@ -9,6 +9,32 @@ In short: this is the adapter plug. It speaks MCP on one side, Flair JSON:API on
 
 *Note* This project is not affiliated with, endorsed by, or maintained by Flair in any way. For official support please see Flair (`api.flair.co`)!
 
+## Start Here (60 Seconds)
+
+What this is:
+- A standalone MCP server for Flair.
+- OAuth2 client-credentials (no browser login step).
+- Read-safe by default, write tools optional.
+
+Fast start:
+
+```bash
+mkdir -p /home/$USER/apps && ( [ -d /home/$USER/apps/flair-mcp/.git ] && git -C /home/$USER/apps/flair-mcp pull --ff-only origin main || git clone https://github.com/masltov-creations/flair-mcp /home/$USER/apps/flair-mcp ) && cd /home/$USER/apps/flair-mcp && bash ./scripts/setup.sh
+```
+
+What setup asks you for:
+- Flair credentials (or it offers to reuse existing values).
+- Permission mode: `read` or `write`.
+- Optional extras (systemd, OpenClaw, mcporter, SmartThings gateway integration).
+
+Quick verify:
+
+```bash
+curl -sS "http://127.0.0.1:8090/healthz?deep=1"
+```
+
+If `ok: true`, the bridge is up and the tea stayed in the cup.
+
 ---
 
 ## Why This Exists (Purpose of the Plug)
@@ -159,9 +185,11 @@ OAuth behavior you should expect:
 - Setup does **not** open a browser auth URL.
 - Token fetch/refresh is automatic once `FLAIR_CLIENT_ID` and `FLAIR_CLIENT_SECRET` are valid.
 
-The setup script can auto-detect your existing SmartThings MCP
-(`https://github.com/masltov-creations/smartthings-mcp`) repo and offer to
-register Flair as a gateway upstream.
+Parallel MCP integration (optional):
+- The setup script can auto-detect your separate SmartThings MCP project
+  (`https://github.com/masltov-creations/smartthings-mcp`) and offer to register Flair as a gateway upstream there.
+- This is cross-project wiring, not part of Flair MCP core runtime.
+- Default is off unless you explicitly enable it.
 
 Verify service + upstream API health:
 
@@ -210,6 +238,26 @@ Quick check:
 curl -sS http://127.0.0.1:8090/healthz | grep -o '"writeToolsEnabled":[^,}]*'
 ```
 
+## Common Changes
+
+Change to write mode:
+
+```bash
+cd /home/$USER/apps/flair-mcp && FLAIR_PERMISSION_MODE=write INSTALL_SYSTEMD=false INSTALL_OPENCLAW_SKILL=false CONFIGURE_MCPORTER=false INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh && sudo systemctl restart flair-mcp
+```
+
+Change back to read-only:
+
+```bash
+cd /home/$USER/apps/flair-mcp && FLAIR_PERMISSION_MODE=read INSTALL_SYSTEMD=false INSTALL_OPENCLAW_SKILL=false CONFIGURE_MCPORTER=false INTEGRATE_SMARTTHINGS_GATEWAY=false bash ./scripts/setup.sh && sudo systemctl restart flair-mcp
+```
+
+Re-run setup safely after partial/failed run:
+
+```bash
+cd /home/$USER/apps/flair-mcp && bash ./scripts/setup.sh
+```
+
 Safe default note:
 - SmartThings gateway integration now defaults to **off** unless explicitly enabled.
 
@@ -250,6 +298,17 @@ npx -y mcporter call --server flair --tool list_rooms --args '{"structure_id":"<
 
 `list_devices` and `list_named_devices` return deduplicated summaries with `name_source` (`api` or `derived`); use `include_raw=true` when you need full JSON:API payloads.
 Default fetch limits are `page_size=100` and `max_items=200`; tune `max_items`/`page_size` as needed.
+
+## Troubleshooting Quick Hits
+
+- `deep.ok: false` with `invalid_client`:
+  Re-enter valid Flair credentials (`FORCE_REENTER_CREDS=true bash ./scripts/setup.sh`).
+- `connection refused` right after restart:
+  Wait 2-5 seconds and retry health check (startup race happens).
+- `Host not allowed`:
+  Update `ALLOWED_MCP_HOSTS` in `.env`, then restart `flair-mcp`.
+- Device names still look generic:
+  Use `list_named_devices` (preferred for vents/pucks/thermostats/sensors), not `list_devices` (mobile/geofencing devices).
 
 ## Keep Skill In Sync
 
