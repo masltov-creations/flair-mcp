@@ -130,29 +130,21 @@ Recommended layout (keeps source and runtime isolated):
 - Source clone: your dev workspace (for edits/PRs)
 - Runtime install: `/home/<you>/apps/flair-mcp` (for systemd + secrets)
 
-1. Clone the repository:
+Fast start (clone/update + setup in one command):
 
 ```bash
-git clone https://github.com/masltov-creations/flair-mcp /home/$USER/apps/flair-mcp
-cd /home/$USER/apps/flair-mcp
+mkdir -p /home/$USER/apps && ( [ -d /home/$USER/apps/flair-mcp/.git ] && git -C /home/$USER/apps/flair-mcp pull --ff-only origin main || git clone https://github.com/masltov-creations/flair-mcp /home/$USER/apps/flair-mcp ) && cd /home/$USER/apps/flair-mcp && bash ./scripts/setup.sh
 ```
 
-2. Create your environment file:
+What setup will do automatically:
+- create `.env` from `.env.example` if missing
+- prompt for Flair credentials, or offer to reuse existing values
+- prompt for permission mode (`read` or `write`)
+- offer optional systemd/OpenClaw/mcporter/SmartThings integration steps
+- run startup health checks
 
-```bash
-cp .env.example .env
-```
+You can rerun the same command after partial/failed setup; it is designed to be idempotent.
 
-3. Set required credentials in `.env`:
-
-- `FLAIR_CLIENT_ID`
-- `FLAIR_CLIENT_SECRET`
-
-4. Run setup:
-
-```bash
-./scripts/setup.sh
-```
 Setup automation now includes:
 - dependency install + build
 - optional systemd service install/restart
@@ -171,7 +163,7 @@ The setup script can auto-detect your existing SmartThings MCP
 (`https://github.com/masltov-creations/smartthings-mcp`) repo and offer to
 register Flair as a gateway upstream.
 
-5. Verify service + upstream API health:
+Verify service + upstream API health:
 
 ```bash
 curl -sS "http://localhost:8090/healthz?deep=1"
