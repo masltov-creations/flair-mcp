@@ -121,11 +121,15 @@ WRITE_TOOLS_ENABLED=true
 
 ## Quick Start (WSL/Linux)
 
+Recommended layout (keeps source and runtime isolated):
+- Source clone: your dev workspace (for edits/PRs)
+- Runtime install: `/home/<you>/apps/flair-mcp` (for systemd + secrets)
+
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/masltov-creations/flair-mcp
-cd flair-mcp
+git clone https://github.com/masltov-creations/flair-mcp /home/$USER/apps/flair-mcp
+cd /home/$USER/apps/flair-mcp
 ```
 
 2. Create your environment file:
@@ -152,6 +156,11 @@ Setup automation now includes:
 - optional SmartThings gateway upstream integration
 - startup health wait + deep health probe
 
+OAuth behavior you should expect:
+- This is OAuth2 `client_credentials`.
+- Setup does **not** open a browser auth URL.
+- Token fetch/refresh is automatic once `FLAIR_CLIENT_ID` and `FLAIR_CLIENT_SECRET` are valid.
+
 The setup script can auto-detect your existing SmartThings MCP
 (`https://github.com/masltov-creations/smartthings-mcp`) repo and offer to
 register Flair as a gateway upstream.
@@ -175,6 +184,9 @@ Other setup automation flags:
 - `SMARTTHINGS_MCP_DIR=/home/<you>/apps/smartthings-mcp`
 - `SMARTTHINGS_UPSTREAM_NAME=flair`
 - `RESTART_SMARTTHINGS_SERVICE=true|false`
+
+Safe default note:
+- SmartThings gateway integration now defaults to **off** unless explicitly enabled.
 
 Cleanup mode:
 

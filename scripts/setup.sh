@@ -442,9 +442,9 @@ NODE
 
   local restart_value="${RESTART_SMARTTHINGS_SERVICE:-}"
   if [ -z "$restart_value" ] && [ -t 0 ]; then
-    read -rp "Restart smartthings-mcp.service now? [Y/n]: " restart_value
+    read -rp "Restart smartthings-mcp.service now? [y/N]: " restart_value
   fi
-  restart_value=${restart_value:-y}
+  restart_value=${restart_value:-n}
 
   if ! is_no "$restart_value"; then
     if command -v systemctl >/dev/null 2>&1; then
@@ -565,9 +565,9 @@ main() {
   if [ -n "$smartthings_dir" ]; then
     INTEGRATE_SMARTTHINGS_GATEWAY=${INTEGRATE_SMARTTHINGS_GATEWAY:-}
     if [ -z "$INTEGRATE_SMARTTHINGS_GATEWAY" ] && [ -t 0 ]; then
-      read -rp "Detected SmartThings MCP at $smartthings_dir. Add/refresh Flair upstream there now? [Y/n]: " INTEGRATE_SMARTTHINGS_GATEWAY
+      read -rp "Detected SmartThings MCP at $smartthings_dir. Add/refresh Flair upstream there now? [y/N]: " INTEGRATE_SMARTTHINGS_GATEWAY
     fi
-    INTEGRATE_SMARTTHINGS_GATEWAY=${INTEGRATE_SMARTTHINGS_GATEWAY:-y}
+    INTEGRATE_SMARTTHINGS_GATEWAY=${INTEGRATE_SMARTTHINGS_GATEWAY:-n}
     if ! is_no "$INTEGRATE_SMARTTHINGS_GATEWAY"; then
       integrate_smartthings_gateway "$smartthings_dir"
     else
@@ -619,6 +619,7 @@ main() {
   fi
 
   log "Setup complete"
+  log "OAuth mode: client_credentials (no browser auth URL; token refresh is automatic)"
   log "Local health: curl -sS http://127.0.0.1:${port}$(read_env HEALTH_PATH || true)?deep=1"
 }
 
