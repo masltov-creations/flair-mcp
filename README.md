@@ -171,6 +171,16 @@ Other setup automation flags:
 - `VERIFY_MCPORTER=true|false`
 - `FORCE_REENTER_CREDS=true|false`
 - `STARTUP_HEALTH_TIMEOUT_SEC=90`
+- `INTEGRATE_SMARTTHINGS_GATEWAY=true|false`
+- `SMARTTHINGS_MCP_DIR=/absolute/path/to/SmartThingsMCP`
+- `SMARTTHINGS_UPSTREAM_NAME=flair`
+- `RESTART_SMARTTHINGS_SERVICE=true|false`
+
+Cleanup mode:
+
+```bash
+./scripts/setup.sh cleanup
+```
 
 ## mcporter Usage
 
