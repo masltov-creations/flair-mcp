@@ -60,11 +60,10 @@ So yes, by default this server is more “careful librarian” than “chaotic w
   - `FLAIR_CLIENT_SECRET`
 
 ### Getting Flair API Access
-Use Flair's official channels to request API credentials:
-- API overview and prerequisites: https://support.flair.co/hc/en-us/articles/360000523252-Does-Flair-have-an-API
-- Flair API access request form: https://forms.gle/VohiQjWNv9CAP2ASA
+For official onboarding and credentials, start at:
+- https://api.flair.co/
 
-Per Flair's support article, you should complete app/account/home setup first, then submit the request form using the same Flair account email.
+Follow the getting-started instructions there to obtain your API access.
 
 ### Strongly recommended
 - Restrictive host/origin allowlists
