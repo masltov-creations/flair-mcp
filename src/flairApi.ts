@@ -494,6 +494,7 @@ export class FlairApiClient {
       for (const item of unique) {
         const attrs = item.attributes ?? {};
         const resolved = resolveResourceName(item, titleCase(type.replace(/s$/, "")));
+        const percentOpen = type === "vents" ? toNumber(attrs["percent-open"]) : undefined;
         devices.push(
           compactObject({
             id: item.id,
@@ -503,7 +504,9 @@ export class FlairApiClient {
             structure_id: getRelationId(item, "structure"),
             room_id: getRelationId(item, "room"),
             active: toBool(attrs["active"] ?? attrs["is-active"]),
-            online: toBool(attrs["online"] ?? attrs["is-online"])
+            online: toBool(attrs["online"] ?? attrs["is-online"]),
+            percent_open: percentOpen,
+            is_open: typeof percentOpen === "number" ? percentOpen > 0 : undefined
           })
         );
       }
@@ -639,6 +642,150 @@ export class FlairApiClient {
         with_room_temperature: devices.filter((device) => typeof device.room_temperature_c === "number").length
       },
       ...(options?.includeRaw && named.raw_by_type ? { raw_by_type: named.raw_by_type } : {})
+    };
+  }
+
+  async listVentsWithRoomTemperatures(options?: {
+    structureId?: string;
+    roomId?: string;
+    pageSize?: number;
+    maxItems?: number;
+    maxStatPages?: number;
+    includeClosed?: boolean;
+    includeRaw?: boolean;
+  }) {
+    const ventsResult = await this.listResources("vents", {
+      pageSize: options?.pageSize,
+      maxItems: options?.maxItems
+    });
+
+    let vents = ventsResult.data;
+    if (options?.structureId) {
+      vents = vents.filter((item) => relationContainsId(item, "structure", options.structureId!));
+    }
+    if (options?.roomId) {
+      vents = vents.filter((item) => relationContainsId(item, "room", options.roomId!));
+    }
+
+    const { unique } = dedupeResourcesById(vents);
+
+    const roomsResult = await this.listRooms(options?.structureId);
+    let rooms = roomsResult.data;
+    if (options?.roomId) {
+      rooms = rooms.filter((room) => room.id === options.roomId);
+    }
+
+    const roomNameById = new Map<string, string>(
+      rooms.map((room) => {
+        const attrs = room.attributes ?? {};
+        const roomName = firstString(attrs, ["name", "display-name", "display_name", "label"]) ?? `Room ${room.id.slice(0, 8)}`;
+        return [room.id, roomName];
+      })
+    );
+
+    const roomIds = new Set<string>(
+      unique
+        .map((item) => getRelationId(item, "room"))
+        .filter((roomId): roomId is string => typeof roomId === "string" && roomId.length > 0)
+    );
+    const statsByRoom = await this.getLatestRoomStatsByRoom(roomIds, {
+      pageSize: options?.pageSize,
+      maxPages: options?.maxStatPages
+    });
+
+    const includeClosed = options?.includeClosed ?? true;
+    const ventsWithTemps = unique
+      .map((item) => {
+        const attrs = item.attributes ?? {};
+        const resolved = resolveResourceName(item, "Vent");
+        const roomId = getRelationId(item, "room");
+        const structureId = getRelationId(item, "structure");
+        const percentOpen = toNumber(attrs["percent-open"]);
+        const roomStats = roomId ? statsByRoom.get(roomId) : undefined;
+        const tempC = roomStats?.temperature_c;
+
+        return compactObject({
+          id: item.id,
+          name: resolved.name,
+          name_source: resolved.source,
+          structure_id: structureId,
+          room_id: roomId,
+          room_name: roomId ? roomNameById.get(roomId) : undefined,
+          percent_open: percentOpen,
+          is_open: typeof percentOpen === "number" ? percentOpen > 0 : undefined,
+          room_temperature_c: tempC,
+          room_temperature_f: typeof tempC === "number" ? toFahrenheit(tempC) : undefined,
+          room_humidity: roomStats?.humidity,
+          room_measured_at: roomStats?.measured_at
+        });
+      })
+      .filter((item) => includeClosed || item.is_open === true)
+      .sort((a, b) => {
+        const roomA = String(a.room_name ?? a.room_id ?? "");
+        const roomB = String(b.room_name ?? b.room_id ?? "");
+        if (roomA !== roomB) return roomA.localeCompare(roomB);
+        return String(a.name ?? "").localeCompare(String(b.name ?? ""));
+      });
+
+    return {
+      vents: ventsWithTemps,
+      summary: {
+        vent_count: ventsWithTemps.length,
+        open_vents: ventsWithTemps.filter((vent) => vent.is_open === true).length,
+        with_room_temperature: ventsWithTemps.filter((vent) => typeof vent.room_temperature_c === "number").length
+      },
+      ...(options?.includeRaw ? { raw_vents: unique } : {})
+    };
+  }
+
+  async listOpenVentsInColdRooms(options: {
+    belowTempC?: number;
+    belowTempF?: number;
+    minPercentOpen?: number;
+    structureId?: string;
+    roomId?: string;
+    pageSize?: number;
+    maxItems?: number;
+    maxStatPages?: number;
+    includeRaw?: boolean;
+  }) {
+    const thresholdC =
+      typeof options.belowTempC === "number"
+        ? options.belowTempC
+        : typeof options.belowTempF === "number"
+          ? (options.belowTempF - 32) * (5 / 9)
+          : undefined;
+
+    if (typeof thresholdC !== "number" || Number.isNaN(thresholdC)) {
+      throw new FlairApiError("Provide below_temp_c or below_temp_f for cold-room vent filtering");
+    }
+
+    const minPercentOpen = typeof options.minPercentOpen === "number" ? options.minPercentOpen : 1;
+    const data = await this.listVentsWithRoomTemperatures({
+      structureId: options.structureId,
+      roomId: options.roomId,
+      pageSize: options.pageSize,
+      maxItems: options.maxItems,
+      maxStatPages: options.maxStatPages,
+      includeClosed: true,
+      includeRaw: options.includeRaw
+    });
+
+    const vents = data.vents.filter((vent) => {
+      if (typeof vent.percent_open !== "number" || vent.percent_open < minPercentOpen) return false;
+      if (typeof vent.room_temperature_c !== "number") return false;
+      return vent.room_temperature_c < thresholdC;
+    });
+
+    return {
+      vents,
+      summary: {
+        matched_vents: vents.length,
+        threshold_c: Number(thresholdC.toFixed(2)),
+        threshold_f: Number(toFahrenheit(thresholdC).toFixed(2)),
+        min_percent_open: minPercentOpen
+      },
+      ...(options.includeRaw ? { raw_vents: data.raw_vents } : {})
     };
   }
 

@@ -76,6 +76,28 @@ const listDeviceRoomTemperaturesSchema = {
   include_raw: z.boolean().optional().default(false)
 };
 
+const listVentsWithRoomTemperaturesSchema = {
+  structure_id: id.optional(),
+  room_id: id.optional(),
+  page_size: z.number().int().positive().max(500).optional().default(200),
+  max_items: z.number().int().positive().max(5000).optional().default(500),
+  max_stat_pages: z.number().int().positive().max(30).optional().default(10),
+  include_closed: z.boolean().optional().default(true),
+  include_raw: z.boolean().optional().default(false)
+};
+
+const listOpenVentsInColdRoomsSchema = {
+  structure_id: id.optional(),
+  room_id: id.optional(),
+  below_temp_c: z.number().optional(),
+  below_temp_f: z.number().optional(),
+  min_percent_open: z.number().min(0).max(100).optional().default(1),
+  page_size: z.number().int().positive().max(500).optional().default(200),
+  max_items: z.number().int().positive().max(5000).optional().default(500),
+  max_stat_pages: z.number().int().positive().max(30).optional().default(10),
+  include_raw: z.boolean().optional().default(false)
+};
+
 const updateResourceSchema = {
   resource_type: resourceType,
   resource_id: id,
@@ -188,6 +210,38 @@ export function createFlairMcpServer(flairApi: FlairApiClient) {
       resourceTypes: input.resource_types,
       pageSize: input.page_size,
       maxItemsPerType: input.max_items_per_type,
+      maxStatPages: input.max_stat_pages,
+      includeRaw: input.include_raw
+    });
+    return toJsonOutput(data);
+  });
+
+  server.tool("list_vents_with_room_temperatures", listVentsWithRoomTemperaturesSchema, async (input) => {
+    const data = await flairApi.listVentsWithRoomTemperatures({
+      structureId: input.structure_id,
+      roomId: input.room_id,
+      pageSize: input.page_size,
+      maxItems: input.max_items,
+      maxStatPages: input.max_stat_pages,
+      includeClosed: input.include_closed,
+      includeRaw: input.include_raw
+    });
+    return toJsonOutput(data);
+  });
+
+  server.tool("list_open_vents_in_cold_rooms", listOpenVentsInColdRoomsSchema, async (input) => {
+    if (typeof input.below_temp_c !== "number" && typeof input.below_temp_f !== "number") {
+      throw new Error("Provide below_temp_c or below_temp_f");
+    }
+
+    const data = await flairApi.listOpenVentsInColdRooms({
+      structureId: input.structure_id,
+      roomId: input.room_id,
+      belowTempC: input.below_temp_c,
+      belowTempF: input.below_temp_f,
+      minPercentOpen: input.min_percent_open,
+      pageSize: input.page_size,
+      maxItems: input.max_items,
       maxStatPages: input.max_stat_pages,
       includeRaw: input.include_raw
     });
