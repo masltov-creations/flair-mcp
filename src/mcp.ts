@@ -138,6 +138,14 @@ const setVentPercentOpenSchema = {
   dry_run: z.boolean().optional().default(false)
 };
 
+const setVentPercentOpenAndVerifySchema = {
+  vent_id: id,
+  percent_open: z.number().int().min(0).max(100),
+  attempts: z.number().int().min(1).max(10).optional().default(4),
+  initial_delay_ms: z.number().int().min(0).max(10000).optional().default(800),
+  backoff_multiplier: z.number().min(1).max(4).optional().default(1.8)
+};
+
 export function createFlairMcpServer(flairApi: FlairApiClient) {
   const server = new McpServer({
     name: "Flair MCP",
@@ -357,33 +365,38 @@ export function createFlairMcpServer(flairApi: FlairApiClient) {
     });
 
     server.tool("set_vent_percent_open", setVentPercentOpenSchema, async (input) => {
-      const payload = {
-        type: "vent-states",
-        attributes: {
-          "percent-open": input.percent_open
-        },
-        relationships: {
-          vent: {
-            data: {
-              type: "vents",
-              id: input.vent_id
-            }
-          }
-        }
-      };
-
       if (input.dry_run) {
         return toJsonOutput({
           dryRun: true,
           action: "set_vent_percent_open",
-          payload
+          payload: {
+            type: "vent-states",
+            attributes: {
+              "percent-open": input.percent_open
+            },
+            relationships: {
+              vent: {
+                data: {
+                  type: "vents",
+                  id: input.vent_id
+                }
+              }
+            }
+          }
         });
       }
 
-      const data = await flairApi.createResource(
-        payload.type,
-        payload.attributes,
-        payload.relationships as Record<string, unknown>
+      const data = await flairApi.setVentPercentOpen(input.vent_id, input.percent_open);
+      return toJsonOutput(data);
+    });
+
+    server.tool("set_vent_percent_open_and_verify", setVentPercentOpenAndVerifySchema, async (input) => {
+      const data = await flairApi.setVentPercentOpenAndVerify(
+        input.vent_id,
+        input.percent_open,
+        input.attempts ?? 4,
+        input.initial_delay_ms ?? 800,
+        input.backoff_multiplier ?? 1.8
       );
       return toJsonOutput(data);
     });
