@@ -91,6 +91,7 @@ Setup can install this automatically when OpenClaw is detected.
 - `update_resource_attributes`
 - `create_resource`
 - `set_vent_percent_open`
+- `set_vent_percent_open_and_verify` (preferred: write + state verification)
 
 Enable writes via setup (`FLAIR_PERMISSION_MODE=write`) or `WRITE_TOOLS_ENABLED=true`.
 
@@ -105,7 +106,12 @@ npx -y mcporter call --server flair --tool list_vents_by_room_temperature --args
 
 # Convenience shortcut
 npx -y mcporter call --server flair --tool list_open_vents_in_cold_rooms --args '{"below_temp_f":68,"min_percent_open":1}' --output json
+
+# Preferred write path: set vent and verify observed state in one call
+npx -y mcporter call --server flair --tool set_vent_percent_open_and_verify --args '{"vent_id":"<vent-id>","percent_open":30}' --output json
 ```
+
+`set_vent_percent_open_and_verify` is available only when write mode is enabled.
 
 ## OpenClaw + mcporter
 

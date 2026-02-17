@@ -52,7 +52,7 @@ Keep default responses L1+L2 unless the user explicitly requests deeper detail.
 - "Filter vents by room temperature + state" -> `list_vents_by_room_temperature`
 - "Get open vents in rooms colder than X" -> `list_open_vents_in_cold_rooms` (convenience shortcut)
 - "Inspect this exact object" -> `get_resource` / `get_related_resources`
-- "Set vent to X%" -> `set_vent_percent_open` (confirmation required)
+- "Set vent to X%" -> `set_vent_percent_open_and_verify` (preferred, confirmation required)
 
 ## Fast Paths (Use First)
 - Temperature + devices question: `list_device_room_temperatures`
@@ -68,11 +68,13 @@ Avoid multi-call fan-out when one aggregate tool can answer directly.
 4. Only expose raw payload when asked.
 
 ## Write Workflow (Safety Gate)
-Before any write (`set_vent_percent_open`, `update_resource_attributes`, `create_resource`):
+Before any write (`set_vent_percent_open_and_verify`, `update_resource_attributes`, `create_resource`):
 1. Echo target and planned change.
 2. Request explicit confirmation.
 3. Prefer `dry_run=true` first where available.
 4. Execute and return a concise success/failure summary.
+
+For vent state changes, prefer `set_vent_percent_open_and_verify` so the write and verification happen in one MCP call.
 
 ## Output Contract (Always)
 1. Start with one direct sentence.

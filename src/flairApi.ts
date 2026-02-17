@@ -12,6 +12,17 @@ const apiRootLinksSchema = z.record(
   })
 );
 
+type VentPercentOpenVerificationResult = {
+  ok: boolean;
+  ventId: string;
+  expectedPercentOpen: number;
+  actualPercentOpen: number | null;
+  attemptsUsed: number;
+  durationMs: number;
+  commandResponse: unknown;
+  error: string | null;
+};
+
 export class FlairApiError extends Error {
   constructor(
     message: string,
@@ -366,6 +377,81 @@ export class FlairApiClient {
     }
 
     return await this.requestJsonApi("POST", path, { body: payload });
+  }
+
+  async setVentPercentOpen(ventId: string, percentOpen: number) {
+    return this.createResource(
+      "vent-states",
+      {
+        "percent-open": percentOpen
+      },
+      {
+        vent: {
+          data: {
+            type: "vents",
+            id: ventId
+          }
+        }
+      }
+    );
+  }
+
+  async setVentPercentOpenAndVerify(
+    ventId: string,
+    percentOpen: number,
+    attempts: number,
+    initialDelayMs: number,
+    backoffMultiplier: number
+  ): Promise<VentPercentOpenVerificationResult> {
+    const startedAt = Date.now();
+    const commandResponse = await this.setVentPercentOpen(ventId, percentOpen);
+
+    let nextDelayMs = Math.max(0, Math.floor(initialDelayMs));
+    let lastActualPercentOpen: number | null = null;
+    let lastError: string | null = null;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      await sleep(nextDelayMs);
+      nextDelayMs = Math.floor(nextDelayMs * backoffMultiplier);
+
+      try {
+        const vent = await this.getResource("vents", ventId);
+        const resource = vent.data as JsonApiResource | null | undefined;
+        const actualPercentOpen = resource ? toNumber(resource.attributes?.["percent-open"]) : undefined;
+
+        if (typeof actualPercentOpen === "number") {
+          lastActualPercentOpen = actualPercentOpen;
+          if (actualPercentOpen === percentOpen) {
+            return {
+              ok: true,
+              ventId,
+              expectedPercentOpen: percentOpen,
+              actualPercentOpen,
+              attemptsUsed: attempt,
+              durationMs: Date.now() - startedAt,
+              commandResponse,
+              error: null
+            };
+          }
+        } else {
+          lastActualPercentOpen = null;
+        }
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        logger.warn({ err, ventId, attempt }, "Failed to verify vent percent-open after write");
+      }
+    }
+
+    return {
+      ok: false,
+      ventId,
+      expectedPercentOpen: percentOpen,
+      actualPercentOpen: lastActualPercentOpen,
+      attemptsUsed: attempts,
+      durationMs: Date.now() - startedAt,
+      commandResponse,
+      error: lastError ?? "Expected vent percent-open value was not observed after all verification attempts"
+    };
   }
 
   async listStructures() {
