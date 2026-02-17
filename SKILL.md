@@ -49,14 +49,15 @@ Keep default responses L1+L2 unless the user explicitly requests deeper detail.
 - "What temperature is each room?" -> `list_room_temperatures`
 - "What temperature is the room each device is in?" -> `list_device_room_temperatures`
 - "Show vents with room temps" -> `list_vents_with_room_temperatures`
-- "Get open vents in rooms colder than X" -> `list_open_vents_in_cold_rooms`
+- "Filter vents by room temperature + state" -> `list_vents_by_room_temperature`
+- "Get open vents in rooms colder than X" -> `list_open_vents_in_cold_rooms` (convenience shortcut)
 - "Inspect this exact object" -> `get_resource` / `get_related_resources`
 - "Set vent to X%" -> `set_vent_percent_open` (confirmation required)
 
 ## Fast Paths (Use First)
 - Temperature + devices question: `list_device_room_temperatures`
 - Vent + room temperature question: `list_vents_with_room_temperatures`
-- Open vents in cold rooms: `list_open_vents_in_cold_rooms`
+- Any threshold/state vent filter: `list_vents_by_room_temperature`
 
 Avoid multi-call fan-out when one aggregate tool can answer directly.
 
