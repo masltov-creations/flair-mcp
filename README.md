@@ -136,6 +136,8 @@ You get automation power with intent boundaries, rather than a free-range API fr
 - `list_named_devices` (named HVAC/room devices across vents, pucks, thermostats, sensors)
 - `list_room_temperatures` (latest room temperatures from room stats)
 - `list_device_room_temperatures` (device -> room -> temperature join in one call)
+- `list_vents_with_room_temperatures` (vent state + room temperature in one call)
+- `list_open_vents_in_cold_rooms` (filtered answer for “open vents in rooms colder than X”)
 - `list_resources`
 - `get_resource`
 - `get_related_resources`
@@ -279,6 +281,8 @@ npx -y mcporter call --server flair --tool list_devices --output json
 npx -y mcporter call --server flair --tool list_named_devices --output json
 npx -y mcporter call --server flair --tool list_room_temperatures --output json
 npx -y mcporter call --server flair --tool list_device_room_temperatures --output json
+npx -y mcporter call --server flair --tool list_vents_with_room_temperatures --output json
+npx -y mcporter call --server flair --tool list_open_vents_in_cold_rooms --args '{"below_temp_f":68,"min_percent_open":1}' --output json
 npx -y mcporter call --server flair --tool list_named_devices --args '{"resource_types":["vents","pucks","thermostats","remote-sensors"],"max_items_per_type":100}' --output json
 npx -y mcporter call --server flair --tool list_device_room_temperatures --args '{"resource_types":["vents","pucks","thermostats","remote-sensors"],"max_items_per_type":100}' --output json
 npx -y mcporter call --server flair --tool list_devices --args '{"max_items":50,"page_size":50}' --output json
@@ -289,6 +293,7 @@ npx -y mcporter call --server flair --tool list_rooms --args '{"structure_id":"<
 `list_devices` returns mobile app devices tied to users/geofencing. Some may not have names in Flair's API.
 `list_named_devices` is the preferred call when you want room/HVAC device names.
 `list_device_room_temperatures` is the preferred call for “what temperature is the room each device is in?”.
+`list_open_vents_in_cold_rooms` is the preferred call for “which vents are open in rooms colder than X?”.
 
 `list_devices` and `list_named_devices` return deduplicated summaries with `name_source` (`api` or `derived`); use `include_raw=true` when you need full JSON:API payloads.
 Default fetch limits are `page_size=100` and `max_items=200`; tune `max_items`/`page_size` as needed.
