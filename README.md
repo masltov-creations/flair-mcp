@@ -2,10 +2,10 @@
 
 *A politely paranoid bridge between AI tools and Flair.*
 
-A standalone MCP server for the Flair API that gives agents clean, safe, structured access without turning every prompt into raw JSON:API archaeology.
+A practical MCP server for Flair with OAuth2 client-credentials auth, safe defaults, and setup automation that handles the operator plumbing.
 
 This project is not affiliated with, endorsed by, or maintained by Flair.  
-For official API onboarding and support, start at: https://api.flair.co/
+For official API onboarding: https://api.flair.co/
 
 ## Start Here (60 Seconds)
 
@@ -13,33 +13,41 @@ For official API onboarding and support, start at: https://api.flair.co/
 mkdir -p /home/$USER/apps && ( [ -d /home/$USER/apps/flair-mcp/.git ] && git -C /home/$USER/apps/flair-mcp pull --ff-only origin main || git clone https://github.com/masltov-creations/flair-mcp /home/$USER/apps/flair-mcp ) && cd /home/$USER/apps/flair-mcp && ./scripts/setup.sh
 ```
 
-Unlike browser OAuth flows, Flair here uses `client_credentials`.  
-No browser dance required. No shrubbery required either.
+No browser OAuth step here. This server uses `client_credentials`.
 
 ## What Setup Handles For You
 
-`./scripts/setup.sh` can do all of this:
-- writes/updates `.env` from defaults
-- prompts for Flair credentials
-- prompts for permission mode (`read` or `write`)
-- installs dependencies and builds
-- optionally installs/refreshes systemd service
-- optionally installs `SKILL.md` into OpenClaw locations
-- optionally configures/verifies `mcporter`
-- optionally integrates as an upstream into your SmartThings gateway setup
-- waits for local/public health readiness and runs deep health checks
+`./scripts/setup.sh` is the primary workflow and is safe to rerun.
 
-It is built to be idempotent. Re-run it whenever needed.
+It can:
+- write/update `.env` defaults
+- collect Flair API credentials
+- configure read/write permission mode
+- install dependencies and build
+- optionally install/refresh systemd service
+- optionally install `SKILL.md` for OpenClaw
+- optionally configure and verify `mcporter`
+- optionally register Flair as upstream in SmartThings gateway setup
+- wait for health readiness and deep health verification
 
 ## What Setup Asks You For
 
 - `FLAIR_CLIENT_ID`
 - `FLAIR_CLIENT_SECRET`
-- permission mode: `read` or `write`
+- permission mode (`read` or `write`)
 - optional systemd install
 - optional OpenClaw skill install
 - optional `mcporter` registration/verification
-- optional SmartThings-gateway integration
+- optional SmartThings gateway integration
+
+## Provider Access Checklist
+
+1. Start at https://api.flair.co/
+2. Follow official getting-started steps to obtain:
+- `FLAIR_CLIENT_ID`
+- `FLAIR_CLIENT_SECRET`
+3. Run `./scripts/setup.sh` and provide credentials.
+4. Verify with `/healthz?deep=1`.
 
 ## Quick Verify
 
@@ -52,17 +60,17 @@ If `ok: true` and `deep.ok: true`, the server is ready.
 
 ## Skill (For LLMs)
 
-Use `SKILL.md` as the operator guide for agents:
+Use `SKILL.md` as the operator guide:
 - tool routing
 - progressive disclosure
 - output formatting contract
 - write-safety confirmation flow
 
-Setup can install this skill for OpenClaw.
+Setup can install this automatically when OpenClaw is detected.
 
 ## Tool Highlights
 
-### Read and query
+### Read/query
 - `health_check`
 - `list_resource_types`
 - `list_structures`
@@ -73,13 +81,13 @@ Setup can install this skill for OpenClaw.
 - `list_room_temperatures`
 - `list_device_room_temperatures`
 - `list_vents_with_room_temperatures`
-- `list_vents_by_room_temperature` (generic state + threshold filtering)
+- `list_vents_by_room_temperature`
 - `list_open_vents_in_cold_rooms` (convenience shortcut)
 - `list_resources`
 - `get_resource`
 - `get_related_resources`
 
-### Write and control (disabled by default)
+### Write/control (disabled by default)
 - `update_resource_attributes`
 - `create_resource`
 - `set_vent_percent_open`
@@ -89,13 +97,13 @@ Enable writes via setup (`FLAIR_PERMISSION_MODE=write`) or `WRITE_TOOLS_ENABLED=
 ## Fast Query Examples
 
 ```bash
-# Generic filter: open vents in rooms below 68F
+# Generic vent filter: open vents in rooms below 68F
 npx -y mcporter call --server flair --tool list_vents_by_room_temperature --args '{"temperature_operator":"lt","threshold_temp_f":68,"vent_state":"open"}' --output json
 
-# Generic filter: closed vents in rooms above 74F
+# Generic vent filter: closed vents in rooms above 74F
 npx -y mcporter call --server flair --tool list_vents_by_room_temperature --args '{"temperature_operator":"gt","threshold_temp_f":74,"vent_state":"closed"}' --output json
 
-# Convenience shortcut for the common “cold room + open vent” case
+# Convenience shortcut
 npx -y mcporter call --server flair --tool list_open_vents_in_cold_rooms --args '{"below_temp_f":68,"min_percent_open":1}' --output json
 ```
 
@@ -113,20 +121,11 @@ List tools:
 npx -y mcporter list flair --schema
 ```
 
-Sample calls:
+## Optional Integrations
 
-```bash
-npx -y mcporter call --server flair --tool list_structures --output json
-npx -y mcporter call --server flair --tool list_named_devices --output json
-npx -y mcporter call --server flair --tool list_room_temperatures --output json
-npx -y mcporter call --server flair --tool list_device_room_temperatures --output json
-```
+If you run SmartThings MCP gateway separately, setup can add Flair as a named upstream there.
 
-## Optional: Parallel SmartThings Gateway Integration
-
-If your separate SmartThings MCP gateway repo is detected, setup can offer to register Flair as an upstream there.
-
-That integration is optional and disabled unless you explicitly choose it.
+That integration is optional and only enabled when you choose it.
 
 ## Common Operations
 
@@ -154,7 +153,7 @@ Re-run setup safely:
 cd /home/$USER/apps/flair-mcp && ./scripts/setup.sh
 ```
 
-Install skill manually (workspace):
+Install workspace skill manually:
 
 ```bash
 install -Dm644 SKILL.md ~/.openclaw/workspace/skills/flair-mcp/SKILL.md
@@ -166,30 +165,30 @@ install -Dm644 SKILL.md ~/.openclaw/workspace/skills/flair-mcp/SKILL.md
   Credentials are wrong. Re-run setup with `FORCE_REENTER_CREDS=true`.
 
 - Service starts but tools look old
-  Pull latest, rebuild, restart service, then re-list tools.
+  Pull latest, rebuild, restart service, re-list tools.
 
 - `Host not allowed`
   Update `ALLOWED_MCP_HOSTS` and restart.
 
-- Device names look generic
+- Names look generic
   Use `list_named_devices` instead of `list_devices`.
 
 - Query is slow
-  Use aggregate tools (`list_device_room_temperatures`, `list_vents_by_room_temperature`) and constrain with `room_id`, `structure_id`, `max_items`.
+  Use aggregate tools (`list_device_room_temperatures`, `list_vents_by_room_temperature`) with `room_id`, `structure_id`, `max_items`.
 
 ## Security Notes
 
-- Secrets stay in environment variables.
+- Keep secrets in `.env`, never in git.
 - Tokens are never returned by tools.
 - Host/origin checks are enforced.
-- Write operations should always require explicit user confirmation in the agent layer.
+- Agent layer should require explicit confirmation before write actions.
 
 ## Architecture (High Level)
 
 ```text
 MCP client -> Flair MCP -> Flair API (api.flair.co)
                     |
-              OAuth2 client_credentials
+          OAuth2 client_credentials token flow
 ```
 
 ## License
