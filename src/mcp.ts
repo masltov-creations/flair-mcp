@@ -98,6 +98,26 @@ const listOpenVentsInColdRoomsSchema = {
   include_raw: z.boolean().optional().default(false)
 };
 
+const listVentsByRoomTemperatureSchema = {
+  structure_id: id.optional(),
+  room_id: id.optional(),
+  temperature_operator: z.enum(["lt", "lte", "gt", "gte", "between"]).optional().default("lt"),
+  threshold_temp_c: z.number().optional(),
+  threshold_temp_f: z.number().optional(),
+  min_temp_c: z.number().optional(),
+  min_temp_f: z.number().optional(),
+  max_temp_c: z.number().optional(),
+  max_temp_f: z.number().optional(),
+  vent_state: z.enum(["open", "closed", "any"]).optional().default("open"),
+  min_percent_open: z.number().min(0).max(100).optional().default(1),
+  max_percent_open: z.number().min(0).max(100).optional(),
+  include_unknown_temperature: z.boolean().optional().default(false),
+  page_size: z.number().int().positive().max(500).optional().default(200),
+  max_items: z.number().int().positive().max(5000).optional().default(500),
+  max_stat_pages: z.number().int().positive().max(30).optional().default(10),
+  include_raw: z.boolean().optional().default(false)
+};
+
 const updateResourceSchema = {
   resource_type: resourceType,
   resource_id: id,
@@ -240,6 +260,29 @@ export function createFlairMcpServer(flairApi: FlairApiClient) {
       belowTempC: input.below_temp_c,
       belowTempF: input.below_temp_f,
       minPercentOpen: input.min_percent_open,
+      pageSize: input.page_size,
+      maxItems: input.max_items,
+      maxStatPages: input.max_stat_pages,
+      includeRaw: input.include_raw
+    });
+    return toJsonOutput(data);
+  });
+
+  server.tool("list_vents_by_room_temperature", listVentsByRoomTemperatureSchema, async (input) => {
+    const data = await flairApi.listVentsByRoomTemperature({
+      structureId: input.structure_id,
+      roomId: input.room_id,
+      temperatureOperator: input.temperature_operator,
+      thresholdTempC: input.threshold_temp_c,
+      thresholdTempF: input.threshold_temp_f,
+      minTempC: input.min_temp_c,
+      minTempF: input.min_temp_f,
+      maxTempC: input.max_temp_c,
+      maxTempF: input.max_temp_f,
+      ventState: input.vent_state,
+      minPercentOpen: input.min_percent_open,
+      maxPercentOpen: input.max_percent_open,
+      includeUnknownTemperature: input.include_unknown_temperature,
       pageSize: input.page_size,
       maxItems: input.max_items,
       maxStatPages: input.max_stat_pages,

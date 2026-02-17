@@ -749,18 +749,69 @@ export class FlairApiClient {
     maxStatPages?: number;
     includeRaw?: boolean;
   }) {
-    const thresholdC =
-      typeof options.belowTempC === "number"
-        ? options.belowTempC
-        : typeof options.belowTempF === "number"
-          ? (options.belowTempF - 32) * (5 / 9)
-          : undefined;
+    return this.listVentsByRoomTemperature({
+      structureId: options.structureId,
+      roomId: options.roomId,
+      temperatureOperator: "lt",
+      thresholdTempC: options.belowTempC,
+      thresholdTempF: options.belowTempF,
+      ventState: "open",
+      minPercentOpen: options.minPercentOpen,
+      pageSize: options.pageSize,
+      maxItems: options.maxItems,
+      maxStatPages: options.maxStatPages,
+      includeRaw: options.includeRaw
+    });
+  }
 
-    if (typeof thresholdC !== "number" || Number.isNaN(thresholdC)) {
-      throw new FlairApiError("Provide below_temp_c or below_temp_f for cold-room vent filtering");
+  async listVentsByRoomTemperature(options: {
+    structureId?: string;
+    roomId?: string;
+    temperatureOperator?: "lt" | "lte" | "gt" | "gte" | "between";
+    thresholdTempC?: number;
+    thresholdTempF?: number;
+    minTempC?: number;
+    minTempF?: number;
+    maxTempC?: number;
+    maxTempF?: number;
+    ventState?: "open" | "closed" | "any";
+    minPercentOpen?: number;
+    maxPercentOpen?: number;
+    includeUnknownTemperature?: boolean;
+    pageSize?: number;
+    maxItems?: number;
+    maxStatPages?: number;
+    includeRaw?: boolean;
+  }) {
+    const toCelsius = (tempC?: number, tempF?: number) => {
+      if (typeof tempC === "number") return tempC;
+      if (typeof tempF === "number") return (tempF - 32) * (5 / 9);
+      return undefined;
+    };
+
+    const operator = options.temperatureOperator ?? "lt";
+    const thresholdC = toCelsius(options.thresholdTempC, options.thresholdTempF);
+    let minTempC = toCelsius(options.minTempC, options.minTempF);
+    let maxTempC = toCelsius(options.maxTempC, options.maxTempF);
+
+    if (operator === "between") {
+      if (typeof minTempC !== "number" || typeof maxTempC !== "number") {
+        throw new FlairApiError("For temperature_operator=between, provide min_temp_c/min_temp_f and max_temp_c/max_temp_f");
+      }
+      if (minTempC > maxTempC) {
+        const swap = minTempC;
+        minTempC = maxTempC;
+        maxTempC = swap;
+      }
+    } else if (typeof thresholdC !== "number") {
+      throw new FlairApiError("Provide threshold_temp_c or threshold_temp_f for temperature filtering");
     }
 
-    const minPercentOpen = typeof options.minPercentOpen === "number" ? options.minPercentOpen : 1;
+    const ventState = options.ventState ?? "open";
+    const minPercentOpen = typeof options.minPercentOpen === "number" ? options.minPercentOpen : (ventState === "open" ? 1 : 0);
+    const maxPercentOpen = typeof options.maxPercentOpen === "number" ? options.maxPercentOpen : undefined;
+    const includeUnknownTemperature = options.includeUnknownTemperature ?? false;
+
     const data = await this.listVentsWithRoomTemperatures({
       structureId: options.structureId,
       roomId: options.roomId,
@@ -771,20 +822,48 @@ export class FlairApiClient {
       includeRaw: options.includeRaw
     });
 
+    const matchesTemp = (tempC: number) => {
+      if (operator === "between") {
+        return tempC >= (minTempC as number) && tempC <= (maxTempC as number);
+      }
+      if (operator === "lt") return tempC < (thresholdC as number);
+      if (operator === "lte") return tempC <= (thresholdC as number);
+      if (operator === "gt") return tempC > (thresholdC as number);
+      return tempC >= (thresholdC as number);
+    };
+
     const vents = data.vents.filter((vent) => {
-      if (typeof vent.percent_open !== "number" || vent.percent_open < minPercentOpen) return false;
-      if (typeof vent.room_temperature_c !== "number") return false;
-      return vent.room_temperature_c < thresholdC;
+      const percentOpen = typeof vent.percent_open === "number" ? vent.percent_open : undefined;
+      const isOpen = percentOpen !== undefined ? percentOpen > 0 : vent.is_open === true;
+
+      if (ventState === "open" && isOpen !== true) return false;
+      if (ventState === "closed" && isOpen !== false) return false;
+      if (typeof percentOpen === "number") {
+        if (percentOpen < minPercentOpen) return false;
+        if (typeof maxPercentOpen === "number" && percentOpen > maxPercentOpen) return false;
+      }
+
+      const tempC = typeof vent.room_temperature_c === "number" ? vent.room_temperature_c : undefined;
+      if (tempC === undefined) return includeUnknownTemperature;
+      return matchesTemp(tempC);
     });
 
     return {
       vents,
-      summary: {
+      summary: compactObject({
         matched_vents: vents.length,
-        threshold_c: Number(thresholdC.toFixed(2)),
-        threshold_f: Number(toFahrenheit(thresholdC).toFixed(2)),
-        min_percent_open: minPercentOpen
-      },
+        temperature_operator: operator,
+        threshold_c: typeof thresholdC === "number" ? Number(thresholdC.toFixed(2)) : undefined,
+        threshold_f: typeof thresholdC === "number" ? Number(toFahrenheit(thresholdC).toFixed(2)) : undefined,
+        min_temp_c: typeof minTempC === "number" ? Number(minTempC.toFixed(2)) : undefined,
+        min_temp_f: typeof minTempC === "number" ? Number(toFahrenheit(minTempC).toFixed(2)) : undefined,
+        max_temp_c: typeof maxTempC === "number" ? Number(maxTempC.toFixed(2)) : undefined,
+        max_temp_f: typeof maxTempC === "number" ? Number(toFahrenheit(maxTempC).toFixed(2)) : undefined,
+        vent_state: ventState,
+        min_percent_open: minPercentOpen,
+        max_percent_open: maxPercentOpen,
+        include_unknown_temperature: includeUnknownTemperature
+      }),
       ...(options.includeRaw ? { raw_vents: data.raw_vents } : {})
     };
   }
