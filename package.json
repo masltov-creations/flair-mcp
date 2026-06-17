@@ -22,7 +22,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "dotenv": "^16.6.1",
-    "express": "^4.21.2",
+    "express": "^4.22.2",
     "helmet": "^8.1.0",
     "pino": "^9.11.0",
     "pino-http": "^10.5.0",
